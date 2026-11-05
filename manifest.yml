@@ -7,7 +7,7 @@ modules:
         function: resolver
       render: native
       title: Spec Guard
-      icon: resource:icons;specguard.svg
+      icon: resource:icons;specguard.png
 
   # Jira work item: compact status in the details sidebar, shown on every work item
   jira:issueContext:
@@ -18,7 +18,7 @@ modules:
       render: native
       title: Spec Guard
       label: Spec alignment
-      icon: resource:icons;specguard.svg
+      icon: resource:icons;specguard.png
 
   # Jira global page: all checked work items, plus demo data
   jira:globalPage:
@@ -28,7 +28,7 @@ modules:
         function: resolver
       render: native
       title: Spec Guard
-      icon: resource:icons;specguard.svg
+      icon: resource:icons;specguard.png
 
   # Confluence spec page: linked work items and the requirement coverage map
   confluence:contentBylineItem:
@@ -39,7 +39,7 @@ modules:
       render: native
       title: Spec Guard
       tooltip: Jira work items that implement this spec
-      icon: resource:icons;specguard.svg
+      icon: resource:icons;specguard.png
 
   # Makes the alignment summary searchable with JQL, e.g. specGuardConflicts > 0
   jira:entityProperty:
@@ -63,7 +63,7 @@ modules:
   rovo:agent:
     - key: spec-guard-agent
       name: Spec Guard
-      icon: resource:icons;specguard.svg
+      icon: resource:icons;specguard.png
       description: "Checks Jira work items against their Confluence specifications and flags drift before code is written."
       prompt: resource:agent-prompt;prompt.txt
       conversationStarters:

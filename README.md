@@ -1,6 +1,6 @@
 # Spec Guard
 
-<img src="docs/specguard-logo.png" width="96" alt="Spec Guard logo">
+<img src="docs/cover.png" alt="Spec Guard: Jira work items checked against the Confluence spec">
 
 Spec Guard checks Jira work items against the Confluence page that specifies them, tells you where they disagree, and keeps them in step when either side changes. Coding agents can use the same checks through MCP, before and after they write code.
 
