@@ -184,7 +184,7 @@ modules:
       name: Create work items for spec gaps
       function: createGapItemsFn
       actionVerb: CREATE
-      description: "Creates Jira work items for requirements of a Confluence spec that no work item covers (gaps in the coverage map), each linked to the spec. Without previewId it only lists what would be created and returns a previewId; call again with it after the user agrees."
+      description: "Creates Jira work items, linked to the spec, for requirements no work item covers. Without previewId it only lists them and returns a previewId; call again with that id after the user agrees."
       inputs:
         spec:
           title: Spec page or work item
