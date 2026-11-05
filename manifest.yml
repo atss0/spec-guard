@@ -1,0 +1,256 @@
+modules:
+  # Jira is gorunumunde sag panel
+  jira:issuePanel:
+    - key: specguard-issue-panel
+      resource: main
+      resolver:
+        function: resolver
+      render: native
+      title: Spec Guard
+      icon: resource:icons;specguard.svg
+
+  # Jira is gorunumu sag tarafi: her iste otomatik gorunen ozet kutusu
+  jira:issueContext:
+    - key: specguard-context
+      resource: context
+      resolver:
+        function: resolver
+      render: native
+      title: Spec Guard
+      label: Spec alignment
+      icon: resource:icons;specguard.svg
+
+  # Jira genel sayfasi: tum islerin uyum tablosu
+  jira:globalPage:
+    - key: specguard-dashboard
+      resource: dashboard
+      resolver:
+        function: resolver
+      render: native
+      title: Spec Guard
+      icon: resource:icons;specguard.svg
+
+  # Confluence sayfa basligi altinda rozet: bu spesifikasyona bagli islerin durumu
+  confluence:contentBylineItem:
+    - key: specguard-byline
+      resource: byline
+      resolver:
+        function: resolver
+      render: native
+      title: Spec Guard
+      tooltip: Jira work items that implement this spec
+      icon: resource:icons;specguard.svg
+
+  # Rovo ajani: Jira/Confluence sohbetinde "spesifikasyon ile is uyumlu mu?" sorularini cevaplar
+  rovo:agent:
+    - key: spec-guard-agent
+      name: Spec Guard
+      icon: resource:icons;specguard.svg
+      description: "Checks Jira work items against their Confluence specifications and flags drift before code is written."
+      prompt: resource:agent-prompt;prompt.txt
+      conversationStarters:
+        - Is this work item aligned with its spec?
+        - What does the spec require for this work item?
+        - Check my implementation against the spec
+      actions:
+        - get-spec-context
+        - check-alignment
+        - verify-change
+        - get-alignment-status
+        - get-spec-coverage
+        - align-work-item
+        - create-gap-work-items
+
+  # Ayni eylemler MCP araclari olarak dis yapay zeka istemcilerine (Claude Code, Cursor...) acilir
+  rovo:mcp:
+    - key: spec-guard-mcp
+      name: Spec Guard
+      tools:
+        - get-spec-context
+        - check-alignment
+        - verify-change
+        - get-alignment-status
+        - get-spec-coverage
+        - align-work-item
+        - create-gap-work-items
+
+  action:
+    - key: get-spec-context
+      name: Get spec context
+      function: getSpecContextFn
+      actionVerb: GET
+      description: "Call BEFORE implementing a Jira work item. Returns the work item, the full text of its linked Confluence spec pages (source of truth) and the latest alignment analysis."
+      inputs:
+        issueKey:
+          title: Work item key
+          type: string
+          required: true
+          description: "The Jira work item key, for example PROJ-123."
+    - key: check-alignment
+      name: Check spec alignment
+      function: checkAlignmentFn
+      actionVerb: GET
+      description: "Re-checks a Jira work item against its linked Confluence spec. Returns each requirement as covered, missing, conflict or unclear, with verbatim quotes, a score and open questions."
+      inputs:
+        issueKey:
+          title: Work item key
+          type: string
+          required: true
+          description: "The Jira work item key, for example PROJ-123."
+    - key: verify-change
+      name: Verify change against spec
+      function: verifyChangeFn
+      actionVerb: GET
+      description: "Call AFTER implementing a Jira work item. Checks a summary or diff of the change against the linked Confluence spec and returns pass, warn or fail with findings and suggestions."
+      inputs:
+        issueKey:
+          title: Work item key
+          type: string
+          required: true
+          description: "The Jira work item key, for example PROJ-123."
+        change:
+          title: Change summary or diff
+          type: string
+          required: true
+          description: "What was implemented, as a concise summary or a unified diff."
+    - key: get-alignment-status
+      name: Get alignment status
+      function: getAlignmentStatusFn
+      actionVerb: GET
+      description: "Fast check without AI: returns the last alignment analysis of a Jira work item and whether the spec or the work item changed since then."
+      inputs:
+        issueKey:
+          title: Work item key
+          type: string
+          required: true
+          description: "The Jira work item key, for example PROJ-123."
+
+    - key: get-spec-coverage
+      name: Get spec coverage
+      function: getSpecCoverageFn
+      actionVerb: GET
+      description: "Maps every requirement of a Confluence spec to the Jira work items that deliver it, and lists gaps (requirements no work item covers) and conflicts."
+      inputs:
+        spec:
+          title: Spec page or work item
+          type: string
+          required: true
+          description: "A Confluence page URL or page ID, or a Jira work item key whose linked spec should be mapped."
+
+    - key: align-work-item
+      name: Align work item with spec
+      function: alignWorkItemFn
+      actionVerb: UPDATE
+      description: "Rewrites the acceptance criteria of a Jira work item so they match its linked Confluence spec (fixing conflicts, adding missing in-scope requirements) and leaves an audit comment."
+      inputs:
+        issueKey:
+          title: Work item key
+          type: string
+          required: true
+          description: "The Jira work item key, for example PROJ-123."
+    - key: create-gap-work-items
+      name: Create work items for spec gaps
+      function: createGapItemsFn
+      actionVerb: CREATE
+      description: "Creates Jira work items for requirements of a Confluence spec that no work item covers (gaps in the coverage map), linked to the spec."
+      inputs:
+        spec:
+          title: Spec page or work item
+          type: string
+          required: true
+          description: "A Confluence page URL or page ID, or a Jira work item key whose linked spec has gaps."
+        requirementIds:
+          title: Requirement IDs
+          type: string
+          required: false
+          description: "Optional comma-separated requirement IDs (e.g. FR-5, SR-1). Empty means all gaps."
+
+  # Confluence sayfasi degisince bagli Jira islerine haber ver
+  trigger:
+    - key: spec-page-updated
+      function: pageUpdatedFn
+      events:
+        - avi:confluence:updated:page
+
+  # Saatlik yedek kontrol: olay gelmese bile degisen spesifikasyonlari yakalar
+  scheduledTrigger:
+    - key: spec-hourly-check
+      function: pollSpecsFn
+      interval: hour
+
+  # Atlassian'in barindirdigi Claude modelleri (veri Atlassian disina cikmaz)
+  llm:
+    - key: specguard-llm
+      model:
+        - claude
+
+  # Arka plan kuyrugu: yapay zeka analizleri ve sayfa degisikligi bildirimleri
+  consumer:
+    - key: specguard-jobs-consumer
+      queue: specguard-jobs
+      function: jobWorkerFn
+
+  function:
+    - key: jobWorkerFn
+      handler: index.jobWorker
+      timeoutSeconds: 600
+    - key: resolver
+      handler: index.handler
+    - key: getSpecContextFn
+      handler: index.getSpecContextAction
+    - key: checkAlignmentFn
+      handler: index.checkAlignmentAction
+    - key: verifyChangeFn
+      handler: index.verifyChangeAction
+    - key: getAlignmentStatusFn
+      handler: index.getAlignmentStatusAction
+    - key: getSpecCoverageFn
+      handler: index.getSpecCoverageAction
+    - key: alignWorkItemFn
+      handler: index.alignWorkItemAction
+    - key: createGapItemsFn
+      handler: index.createGapItemsAction
+    - key: pollSpecsFn
+      handler: index.pollSpecs
+    - key: pageUpdatedFn
+      handler: index.pageUpdated
+
+resources:
+  - key: main
+    path: src/frontend/index.jsx
+  - key: context
+    path: src/frontend/context.jsx
+  - key: dashboard
+    path: src/frontend/dashboard.jsx
+  - key: byline
+    path: src/frontend/byline.jsx
+  - key: icons
+    path: src/icons
+  - key: agent-prompt
+    path: src/prompts
+
+permissions:
+  # Map bicimi: arka plan isleri (kuyruk, tetikleyici) isi baslatan kullanicinin yetkisiyle
+  # calisabilsin diye okuma izinlerinde allowImpersonation acik.
+  scopes:
+    read:jira-work:
+      allowImpersonation: true
+    write:jira-work: {}
+    read:page:confluence:
+      allowImpersonation: true
+    read:confluence-content.summary: {}
+    write:page:confluence: {}
+    read:space:confluence: {}
+    storage:app: {}
+
+app:
+  runtime:
+    name: nodejs24.x
+    memoryMB: 512
+    architecture: arm64
+  id: ari:cloud:ecosystem::app/00236d0b-a8f0-4b50-82c2-f1d2d34642cc
+  compatibility:
+    jira:
+      required: true
+    confluence:
+      required: false
