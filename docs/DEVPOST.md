@@ -1,51 +1,63 @@
-# Spec Guard — Devpost submission text
+# Spec Guard — Devpost submission
 
 **Category:** Apps for Software Teams
 **Bonus prize:** Best app with Atlassian MCP (also eligible: Best Agents)
-**Tagline:** Keep Jira work items — and the code your AI agents write — in sync with your Confluence specs.
+**Tagline:** Checks Jira work items, and the code agents write for them, against the Confluence spec.
 
 ## Inspiration
-Every team we know has shipped the wrong thing for the same reason: the spec in Confluence said one thing, the Jira ticket said another, and the developer built from the ticket. A PM tightens a security requirement from 48 to 24 hours; the ticket still says 48; QA finds it a week later — or a customer does.
+A PM changes a requirement in Confluence: the password reset link now expires after 24 hours. The Jira work item still says 48. The developer builds from the work item. Someone notices in QA, or a customer does.
 
-AI coding agents make this worse. An agent reads the ticket it is given and nothing else. If the ticket is stale, the agent confidently builds the stale requirement, faster than ever.
+Coding agents make this more likely. An agent reads the work item it is given. If that work item is out of date, the agent builds the out-of-date requirement, quickly and confidently.
 
 ## What it does
-Spec Guard treats the Confluence specification as the source of truth and keeps everything downstream aligned with it.
+Spec Guard treats the Confluence spec as the source of truth.
 
-- **Alignment report on every work item.** Spec Guard reads the linked spec, works out the work item's scope, and lists every in-scope requirement as covered, missing, conflicting or delivered by another work item — with verbatim quotes from both sides, so you can check its reasoning in seconds.
-- **Align work item with spec.** One click proposes corrected acceptance criteria with the spec's exact values; you preview the diff, apply it, and an audit comment records what changed. In our demo, alignment jumps from 27% to 89%.
-- **Requirement coverage map on the spec.** On the Confluence page: every requirement → the work items that deliver it, the conflicts, and the gaps no work item covers — and one click creates linked work items for the gaps.
-- **Spec change propagation.** When a spec changes, every linked work item gets a comment with the before/after of the changed requirements and their impact, and its report is flagged for re-check.
-- **Verify a change.** Paste a summary or diff; Spec Guard says pass / needs attention / fails spec — judging only the change, and separately flagging where the ticket itself is wrong.
-- **For AI agents — Rovo and MCP.** The same capabilities are a Rovo agent and seven MCP tools. Claude Code or Cursor call `get-spec-context` before coding and `verify-change` after, so the agent builds from the real requirements, not a stale ticket — and can `align-work-item` or `create-gap-work-items` itself.
+- **Alignment report on every work item.** It works out which requirements of the linked spec the work item is responsible for and marks each one covered, missing, conflicting, unclear, or delivered by another work item. Every finding quotes both the spec and the work item, and every quote is checked against its source.
+- **Align work item with spec.** Proposes acceptance criteria with the spec's values. You review the changes and apply them; a comment records what changed. In the demo the work item goes from 27% to 89% aligned.
+- **Coverage map on the spec page.** For each requirement: the work items that deliver it, conflicts between them, and gaps nobody is building. One click creates linked work items for the gaps.
+- **Spec changes reach the work items.** Linked work items get a comment and are marked out of date; the details are shown in Spec Guard to people who can read the spec. Work items are re-checked automatically when their description changes.
+- **Verify a change.** Paste a summary or diff and get pass / needs attention / fails spec, with spec quotes and fixes.
+- **Search drift with JQL**, e.g. `specGuardConflicts > 0`.
+- **Rovo agent and nine MCP tools.** Claude Code calls `get-spec-context` before coding and `verify-change` after, so it builds from the spec rather than from a stale ticket. It can also propose a fix to the work item (`align-work-item`), which is only applied after the user approves (`apply-alignment`).
 
 ## How we built it
-- **Atlassian Forge**, UI Kit: Jira issue panel, issue context (sidebar), global page; Confluence byline item.
-- **Forge LLM** (Atlassian-hosted Claude) for every analysis — nothing leaves Atlassian; the app is eligible for **Runs on Atlassian**.
-- **Rovo**: `rovo:agent` with seven actions; the same actions are exposed through **`rovo:mcp`**.
-- **Forge events queue** for long-running AI work, with **offline user impersonation**: each background job runs with the permissions of the user who started it.
-- **Forge KVS** for analyses, spec snapshots (for before/after diffs) and the spec ↔ work item index.
-- **Confluence product events** plus an hourly scheduled fallback for spec-change notifications.
-- Prompts are built around transparency: verbatim quotes, explicit scope, sibling-work-item awareness, and a strict separation between "the change is wrong" and "the ticket is wrong".
+- Atlassian Forge with UI Kit: Jira issue panel, issue context, global page and a Confluence byline.
+- Forge LLM (Claude hosted by Atlassian). No data leaves Atlassian; the app is eligible for Runs on Atlassian.
+- Rovo agent with nine actions, exposed to external agents through `rovo:mcp`.
+- A Forge events queue for all LLM work. Background jobs use offline user impersonation, so they run with the permissions of the user who started them.
+- Forge KVS for analyses, spec snapshots and a spec-to-work-item index; an issue property indexed for JQL.
+- Triggers for Confluence page updates and Jira work item changes, plus an hourly check as a fallback.
+
+Design choices aimed at trust:
+- Quotes are verified against the source text; unverified quotes are labelled.
+- Spec and work item text is passed to the model as data, with instructions inside it ignored.
+- Analyses and diffs are only shown to users who can read the spec; Jira comments never contain spec text.
+- Writes are always user-initiated and previewed.
+
+## Evaluation
+On a seeded spec with 4 planted conflicts across 4 work items, analysed 3 times each: 11 of 12 conflicts found, 0 false conflicts, 0 false "missing" findings, 107 of 107 quotes found word for word in the sources, median 14 seconds per analysis. Details and limitations: docs/EVALUATION.md in the repository.
 
 ## Challenges we ran into
-- Reading Confluence from background jobs as the app user failed on restricted spaces; switching to offline user impersonation fixed it and made the security model cleaner.
-- A Forge platform bug blocks MCP tools for apps installed in both Jira and Confluence; we found the workaround (enable tools while the app is Jira-only) and documented it.
-- Early versions flagged requirements that belonged to other tickets. Teaching the model a work item's scope and its sibling work items made the reports trustworthy.
+- Background jobs that read Confluence as the app user failed on restricted spaces. Offline user impersonation fixed that and made the permission model simpler.
+- MCP tools of an app connected to both Jira and Confluence are blocked by a Forge issue; we found the workaround and documented it.
+- Early versions reported requirements owned by other work items as missing. Giving the model the work item's scope and its sibling work items removed those false findings (0 in the evaluation).
 
-## Accomplishments we're proud of
-- A full loop: detect drift → explain it with quotes → fix the ticket → find gaps → create tickets → notify on spec changes → let AI agents check their own work.
-- Permission-aware by design: a user who cannot read a spec never sees analyses derived from it — in Jira, Confluence, Rovo or MCP.
-- "Try with demo data" lets anyone see it working on an empty site in under a minute.
+## Accomplishments that we're proud of
+- The whole loop works end to end: find drift, explain it with verified quotes, fix the work item, find and fill gaps, propagate spec changes, and let coding agents check their own work.
+- "Try with demo data" shows the app working on an empty site in about a minute.
 
 ## What we learned
-Specification drift is less a writing problem than a context problem — and AI agents need the same context humans do, delivered through the tools they already use.
+Spec drift is mostly a context problem. People and agents both need the current requirement at the moment they act, inside the tool they are already using.
 
 ## What's next
-- Pull request checks once Forge supports Bitbucket in multi-app apps.
-- Teamwork Graph to discover spec ↔ work item links automatically.
-- Requirement-level traceability fields and JQL search (e.g. "all work items with spec conflicts").
+- Pull request checks when Forge supports Bitbucket in apps that span Jira and Confluence.
+- Teamwork Graph to find spec and work item links automatically.
+- Longer and non-English evaluation sets.
+
+## Built with
+Atlassian Forge, UI Kit, Forge LLM, Rovo, rovo:mcp, Forge events, Forge KVS, Jira REST, Confluence REST, JavaScript.
 
 ## Try it
-Installation link: https://developer.atlassian.com/console/install/00236d0b-a8f0-4b50-82c2-f1d2d34642cc?signature=AYABeANXnkRj8HTUktLBcipDCiMAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4CxqLTo9l4lqXuFjNim1xJM%2Bp%2F3TVP9xHS2BrU5DRRucB5R7YMDOdYQ2qI8zw%2BemziAAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDIfsHqTrZqFxohTPugIBEIA7bizlk2Qdd0QT%2BV1mWdRnlwi2XODKze6VP7WW2FxGnY47pQcZarof5zdfwBXbv1wJfCZQRU8n5o85GQYAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHi9bVMAkme4qVQX1fQHo6ePw3H40A7cGfz7yrmSfBWMXgFLc99DspU4OhiaWHU6POCdAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMt0HI%2BPj7h2Vw6v3EAgEQgDuryNSL7I8e6qig9heuqBYzRJ0dl9IkJTGTQgr4ZUqpykeIApCgkb%2B3Vfvkkp4ZjfzrECmXWRHp9v7M%2FQAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeDYASx0XCjkny4iLV6vz%2BKtEGSGT6kdt0QRpkn6D%2FlVEASJNilwFMGMO8xJXG3kf%2B5EAAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAyMypGgeVX9Ft8XNs0CARCAO7JMtclSUtw5VQdZRIuetcDvbAI1rjjrEJGPGMs2h0GooMXWEjSWRBC86NP%2FK%2BDyMkhbrdT2V5Z0MY%2BdAgAAAAAMAAAQAAAAAAAAAAAAAAAAACvZFdow3E1JwxQ6vTpoIS3%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADIKPmz3jAqCHdRqw83sRUGfZI5zE6O7idEUKNLBh7NjpzO7%2FSSrUDyzkoxaN%2FmMVMjgASJCBBzU3WWcy9exyDVJsgM%3D&product=jira&product=confluence
-Code: https://github.com/atss0/spec-guard
+- Installation link: see the README (install into Jira first, then Confluence).
+- Code: https://github.com/atss0/spec-guard
+- Rovo and MCP need a Rovo-enabled site; everything else works on a free developer site.

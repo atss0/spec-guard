@@ -1,23 +1,22 @@
 /**
- * Confluence sayfa basligi altindaki Spec Guard rozeti.
- * 1) Bu spesifikasyona bagli Jira isleri ve uyum durumlari
- * 2) Kapsama haritasi: her gereksinim hangi islerde karsilaniyor, hangileri hic karsilanmiyor (bosluk)
+ * Spec Guard byline on a Confluence page: the work items that implement this spec, and the
+ * requirement coverage map (which work items deliver each requirement, and the gaps).
  */
 import React, { useEffect, useState } from 'react';
 import ForgeReconciler, {
   Box,
   Button,
+  Em,
+  Inline,
+  Link,
+  LoadingButton,
+  Lozenge,
   Modal,
   ModalBody,
   ModalFooter,
   ModalHeader,
   ModalTitle,
   ModalTransition,
-  Em,
-  Inline,
-  Link,
-  LoadingButton,
-  Lozenge,
   SectionMessage,
   Spinner,
   Stack,
@@ -47,7 +46,7 @@ const card = xcss({
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const Keys = ({ keys }) => (
-  <Inline space="space.050">
+  <Inline space="space.050" shouldWrap>
     {keys.map((k) => (
       <Link key={k} href={`/browse/${k}`} openNewTab>
         {k}
@@ -56,7 +55,7 @@ const Keys = ({ keys }) => (
   </Inline>
 );
 
-/** Bosluklar icin is olusturma: onay penceresi, sonra olusan islerin listesi. */
+/** Creates work items for uncovered requirements after the user confirms. */
 const GapCreator = ({ gaps, onCreated }) => {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -88,9 +87,7 @@ const GapCreator = ({ gaps, onCreated }) => {
             </Inline>
           ))}
           {result.skipped.map((c) => (
-            <Text key={c.id}>
-              {c.id} already has {c.key}
-            </Text>
+            <Text key={c.id}>{c.key ? `${c.id} already has ${c.key}` : `${c.id} is being created by someone else`}</Text>
           ))}
         </Stack>
       </SectionMessage>
@@ -112,8 +109,8 @@ const GapCreator = ({ gaps, onCreated }) => {
             <ModalBody>
               <Stack space="space.100">
                 <Text>
-                  Spec Guard will create one work item per requirement, in the same project and type as the work items already linked to
-                  this spec. Each one links back to this page and quotes the requirement.
+                  One work item per requirement, in the same project and type as the work items already linked to this spec. Each one links back
+                  to this page and quotes the requirement.
                 </Text>
                 {gaps.map((g) => (
                   <Text key={g.id}>
@@ -155,16 +152,15 @@ const CoverageView = ({ cov, stale, running, onRun }) => {
         </Lozenge>
       </Inline>
       {cov.summary ? <Text>{cov.summary}</Text> : null}
-      {t.gap ? <GapCreator gaps={cov.requirements.filter((q) => q.status === 'gap')} onCreated={onRun} /> : null}
       {stale ? (
         <SectionMessage appearance="warning">
           <Text>The spec or its linked work items changed since this map was built.</Text>
         </SectionMessage>
       ) : null}
+      {t.gap ? <GapCreator gaps={cov.requirements.filter((q) => q.status === 'gap')} onCreated={onRun} /> : null}
       {reqs.map((q) => (
         <Box key={q.id} xcss={card}>
           <Stack space="space.050">
-            {/* Etiket ve kimlik ayri satirda: uzun gereksinim metni etiketi sikistirmasin */}
             <Inline space="space.075" alignBlock="center">
               <Lozenge appearance={COV[q.status].appearance} isBold>
                 {COV[q.status].label}
@@ -188,6 +184,7 @@ const CoverageView = ({ cov, stale, running, onRun }) => {
             {q.status === 'gap' && q.specQuote ? (
               <Text>
                 <Em>“{q.specQuote}”</Em>
+                {q.specQuoteVerified === false ? ' (quote not found word for word on this page)' : ''}
               </Text>
             ) : null}
           </Stack>
@@ -250,11 +247,11 @@ const App = () => {
         </SectionMessage>
       ) : null}
       {items.rows.length === 0 ? (
-        <Text>No checked Jira work items link this page yet. Link this page from a work item and open its Spec Guard panel.</Text>
+        <Text>No checked work items link this page yet.</Text>
       ) : (
         <Stack space="space.075">
           <Text>
-            <Strong>{items.rows.length}</Strong> work item(s) implement this spec · <Strong>{items.drifting}</Strong> with conflicts
+            <Strong>{items.rows.length}</Strong> work item(s) implement this spec, <Strong>{items.drifting}</Strong> with conflicts
           </Text>
           {items.rows.map((r) => (
             <Inline key={r.issueKey} space="space.100" alignBlock="center" shouldWrap>
@@ -274,9 +271,7 @@ const App = () => {
         <CoverageView cov={cov.coverage} stale={cov.stale} running={running} onRun={runCoverage} />
       ) : (
         <Stack space="space.075">
-          <Text>
-            Map every requirement of this spec to the Jira work items that deliver it, and find requirements that no work item covers.
-          </Text>
+          <Text>Map every requirement of this spec to the Jira work items that deliver it, and find the ones nobody is building.</Text>
           <Inline>
             <LoadingButton appearance="primary" isLoading={running} onClick={runCoverage}>
               Map requirement coverage

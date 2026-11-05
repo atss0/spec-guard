@@ -1,7 +1,6 @@
 /**
- * "Try with demo data": bos bir sitede Spec Guard'i birkac saniyede denemek icin
- * bilerek sapma iceren hazir bir senaryo olusturur (Confluence spesifikasyonu + 3 Jira isi).
- * Tum istekler kullanicinin kendi yetkisiyle (asUser) yapilir.
+ * "Try with demo data": creates a Confluence spec and three linked work items that deliberately drift
+ * from it, so the app can be tried on an empty site. All requests use the current user's permissions.
  */
 import api, { route } from '@forge/api';
 
@@ -54,7 +53,7 @@ async function ok(res, what) {
   return res.json();
 }
 
-/** Kullanicinin is olusturabildigi Jira projeleri ve Confluence alanlari (secim listeleri icin). */
+/** Jira spaces the user can create work items in, and Confluence spaces (for the pickers). */
 export async function demoTargets() {
   const projects = await ok(
     await api.asUser().requestJira(route`/rest/api/3/project/search?action=create&maxResults=50&orderBy=name`),
@@ -63,14 +62,14 @@ export async function demoTargets() {
   const spaces = await ok(await api.asUser().requestConfluence(route`/wiki/api/v2/spaces?status=current&limit=100&sort=name`), 'Listing spaces');
   return {
     projects: (projects.values || []).map((p) => ({ key: p.key, name: p.name })),
-    // Kisisel alanlar sona: takim alanlari once gelsin
+    // personal spaces last
     spaces: (spaces.results || [])
       .map((s) => ({ id: String(s.id), key: s.key, name: s.type === 'personal' ? `${s.name} (personal)` : s.name, personal: s.type === 'personal' }))
       .sort((a, b) => Number(a.personal) - Number(b.personal)),
   };
 }
 
-/** Projede kullanilabilecek alt gorev olmayan bir is turu: once Story, sonra Task, sonra ilki. */
+/** A non-subtask work item type of the project: Story, else Task, else the first one. */
 async function pickIssueType(projectKey) {
   const meta = await ok(await api.asUser().requestJira(route`/rest/api/3/issue/createmeta/${projectKey}/issuetypes`), 'Reading issue types');
   const types = (meta.issueTypes || meta.values || []).filter((t) => !t.subtask);
@@ -80,7 +79,7 @@ async function pickIssueType(projectKey) {
   return t.id;
 }
 
-/** Demo senaryosunu olusturur; olusan sayfa ve is anahtarlarini dondurur. */
+/** Creates the demo scenario; returns the page and the work item keys. */
 export async function createDemo(projectKey, spaceId) {
   if (!projectKey || !spaceId) throw new Error('Choose a Jira space (project) and a Confluence space.');
   const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');

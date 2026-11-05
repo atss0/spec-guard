@@ -1,7 +1,5 @@
 /**
- * Spec Guard Jira is paneli (UI Kit).
- * Uc durum gosterir: spesifikasyon bagli degil / henuz analiz yok / analiz sonucu.
- * Sadece @forge/react bilesenleri kullanilir (UI Kit kurali).
+ * Spec Guard issue panel: alignment report, align-with-spec, and change verification.
  */
 import React, { useEffect, useState } from 'react';
 import ForgeReconciler, {
@@ -24,11 +22,13 @@ import ForgeReconciler, {
   Tabs,
   Text,
   TextArea,
+  Toggle,
+  Tooltip,
   xcss,
 } from '@forge/react';
 import { invoke } from '@forge/bridge';
+import { pollJob, timeAgo } from './poll';
 
-// Durum -> (etiket, Lozenge gorunumu)
 const STATUS = {
   conflict: { label: 'Conflict', appearance: 'removed' },
   missing: { label: 'Missing', appearance: 'moved' },
@@ -53,16 +53,18 @@ const card = xcss({
 
 const scoreAppearance = (s) => (s === null ? 'default' : s >= 85 ? 'success' : s >= 60 ? 'moved' : 'removed');
 
-const timeAgo = (iso) => {
-  if (!iso) return '';
-  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m} min ago`;
-  const h = Math.round(m / 60);
-  return h < 24 ? `${h} h ago` : `${Math.round(h / 24)} d ago`;
-};
+/** A quote with a marker when it could not be found in its source. */
+const Quote = ({ text, verified }) => (
+  <>
+    <Em>“{text}”</Em>
+    {verified === false ? (
+      <Tooltip content="This quote was not found word for word in the source. Check it before relying on it.">
+        <Lozenge appearance="moved">unverified quote</Lozenge>
+      </Tooltip>
+    ) : null}
+  </>
+);
 
-/** Tek bir gereksinim karti: durum, gereksinim, iki taraftan alinti ve aciklama. */
 const RequirementCard = ({ r }) => (
   <Box xcss={card}>
     <Stack space="space.075">
@@ -72,24 +74,20 @@ const RequirementCard = ({ r }) => (
       </Inline>
       {r.specQuote ? (
         <Text>
-          Spec{r.page ? ` (${r.page})` : ''}: <Em>“{r.specQuote}”</Em>
+          Spec{r.page ? ` (${r.page})` : ''}: <Quote text={r.specQuote} verified={r.specQuoteVerified} />
         </Text>
       ) : null}
       {r.status === 'elsewhere' ? (
-        <Text>
-          Delivered by {r.coveredBy ? <Link href={`/browse/${r.coveredBy}`}>{r.coveredBy}</Link> : 'another work item'}
-        </Text>
+        <Text>Delivered by {r.coveredBy ? <Link href={`/browse/${r.coveredBy}`}>{r.coveredBy}</Link> : 'another work item'}</Text>
       ) : (
-        <Text>
-          Work item: {r.issueQuote ? <Em>“{r.issueQuote}”</Em> : <Em>not mentioned</Em>}
-        </Text>
+        <Text>Work item: {r.issueQuote ? <Quote text={r.issueQuote} verified={r.issueQuoteVerified} /> : <Em>not mentioned</Em>}</Text>
       )}
       {r.explanation ? <Text>{r.explanation}</Text> : null}
     </Stack>
   </Box>
 );
 
-/** Spesifikasyon degisikligi bildirimi (tetikleyicinin kaydettigi fark). */
+/** Before/after of a spec change (only shown to users who can read the spec). */
 const PendingChange = ({ c }) => (
   <Stack space="space.050">
     <Text>
@@ -99,17 +97,14 @@ const PendingChange = ({ c }) => (
     {c.diff
       ? c.diff.changes.slice(0, 3).map((d, i) => (
           <Text key={i}>
-            <Em>“{d.before || '—'}”</Em> → <Em>“{d.after || '—'}”</Em>
+            <Em>“{d.before || '(new)'}”</Em> → <Em>“{d.after || '(removed)'}”</Em>
           </Text>
         ))
       : null}
   </Stack>
 );
 
-/**
- * "Align with spec": isin kabul kriterlerini spesifikasyona gore yeniden yazan oneriyi hazirlar,
- * onizleme gosterir; kullanici onaylarsa Jira isine uygular.
- */
+/** Proposes acceptance criteria that match the spec; applies them only after the user confirms. */
 const FixPanel = ({ onApplied }) => {
   const [state, setState] = useState('idle'); // idle | working | ready | applying | done
   const [proposal, setProposal] = useState(null);
@@ -124,24 +119,13 @@ const FixPanel = ({ onApplied }) => {
       setState('idle');
       return;
     }
-    for (let i = 0; i < 80; i++) {
-      await new Promise((res) => setTimeout(res, i < 5 ? 2500 : 4000));
-      const s = await invoke('getFix');
-      if (!s.ok) {
-        setError(s.error);
-        break;
-      }
-      if (s.data && s.data.state === 'done') {
-        setProposal(s.data.proposal);
-        setState('ready');
-        return;
-      }
-      if (s.data && s.data.state === 'error') {
-        setError(s.data.error);
-        break;
-      }
+    try {
+      setProposal(await pollJob('getFix'));
+      setState('ready');
+    } catch (e) {
+      setError(e.message);
+      setState('idle');
     }
-    setState('idle');
   };
 
   const apply = async () => {
@@ -159,7 +143,7 @@ const FixPanel = ({ onApplied }) => {
   if (state === 'done') {
     return (
       <SectionMessage appearance="success" title="Work item updated">
-        <Text>The acceptance criteria now match the spec. An audit comment was added. Reload the work item to see the new description.</Text>
+        <Text>The acceptance criteria now match the spec and an audit comment was added. Reload the work item to see the new description.</Text>
       </SectionMessage>
     );
   }
@@ -169,7 +153,7 @@ const FixPanel = ({ onApplied }) => {
         <Stack space="space.100">
           {proposal.changes.length ? (
             <Stack space="space.050">
-              <Strong>What changes</Strong>
+              <Strong>Changes</Strong>
               {proposal.changes.map((c, i) => (
                 <Text key={i}>• {c}</Text>
               ))}
@@ -181,6 +165,9 @@ const FixPanel = ({ onApplied }) => {
               <Text key={i}>• {c}</Text>
             ))}
           </Stack>
+          <Text>
+            <Em>Only the acceptance criteria section of the description is replaced. The rest stays as it is.</Em>
+          </Text>
           {error ? <Text>{error}</Text> : null}
           <Inline space="space.100">
             <LoadingButton appearance="primary" isLoading={state === 'applying'} onClick={apply}>
@@ -201,20 +188,21 @@ const FixPanel = ({ onApplied }) => {
         <LoadingButton appearance="primary" isLoading={state === 'working'} onClick={propose}>
           Align work item with spec
         </LoadingButton>
-        <Text>Preview first — nothing changes until you apply.</Text>
+        <Text>You review the changes before anything is saved.</Text>
       </Inline>
     </Stack>
   );
 };
 
-const AlignmentView = ({ status, onRun, running }) => {
+const AlignmentView = ({ status, onRun, onApplied, running }) => {
   const a = status.analysis;
   const reqs = [...a.requirements].sort((x, y) => ORDER[x.status] - ORDER[y.status]);
   const counts = reqs.reduce((m, r) => ({ ...m, [r.status]: (m[r.status] || 0) + 1 }), {});
+  const qc = a.quoteCheck;
   return (
     <Stack space="space.200">
       {status.stale ? (
-        <SectionMessage appearance="warning" title="The specification changed since the last check">
+        <SectionMessage appearance="warning" title="Out of date">
           <Stack space="space.100">
             {status.staleReasons.map((r, i) => (
               <Text key={i}>• {r}</Text>
@@ -232,7 +220,7 @@ const AlignmentView = ({ status, onRun, running }) => {
       ) : null}
 
       <Inline space="space.150" alignBlock="center" spread="space-between">
-        <Inline space="space.100" alignBlock="center">
+        <Inline space="space.100" alignBlock="center" shouldWrap>
           <Lozenge appearance={scoreAppearance(a.score)} isBold>
             {a.score === null ? 'No requirements' : `${a.score}% aligned`}
           </Lozenge>
@@ -252,7 +240,7 @@ const AlignmentView = ({ status, onRun, running }) => {
       </Inline>
 
       {a.summary ? <Text>{a.summary}</Text> : null}
-      {counts.conflict || counts.missing ? <FixPanel onApplied={onRun} /> : null}
+      {counts.conflict || counts.missing ? <FixPanel onApplied={onApplied} /> : null}
       {a.scope ? (
         <Text>
           <Strong>Scope:</Strong> {a.scope}
@@ -260,8 +248,8 @@ const AlignmentView = ({ status, onRun, running }) => {
       ) : null}
       <Text>
         <Em>
-          Checked {timeAgo(status.analyzedAt)} against{' '}
-          {status.pages.map((p) => `“${p.title}” v${p.version}`).join(', ')}
+          Checked {timeAgo(status.analyzedAt)} against {status.pages.map((p) => `“${p.title}” v${p.version}`).join(', ')}
+          {qc && qc.checked ? ` · ${qc.verified} of ${qc.checked} quotes found word for word in the sources` : ''}
         </Em>
       </Text>
 
@@ -284,7 +272,6 @@ const AlignmentView = ({ status, onRun, running }) => {
   );
 };
 
-/** "Bir degisikligi dogrula" sekmesi: kod degisikligi ozetini spesifikasyona gore denetler. */
 const VerifyView = () => {
   const [change, setChange] = useState('');
   const [busy, setBusy] = useState(false);
@@ -295,50 +282,31 @@ const VerifyView = () => {
     setError(null);
     setResult(null);
     const r = await invoke('verifyChange', { change });
-    if (!r.ok) {
-      setError(r.error);
-      setBusy(false);
-      return;
-    }
-    if (!r.data.queued) {
-      setResult(r.data.result);
-      setBusy(false);
-      return;
-    }
-    // Denetim arka planda calisir; bitene kadar birkac saniyede bir sor
-    for (let i = 0; i < 80; i++) {
-      await new Promise((res) => setTimeout(res, i < 5 ? 2500 : 4000));
-      const s = await invoke('getVerify');
-      if (!s.ok) {
-        setError(s.error);
-        break;
-      }
-      if (s.data && s.data.state === 'done') {
-        setResult(s.data.result);
-        break;
-      }
-      if (s.data && s.data.state === 'error') {
-        setError(s.data.error);
-        break;
+    if (!r.ok) setError(r.error);
+    else {
+      try {
+        setResult(await pollJob('getVerify'));
+      } catch (e) {
+        setError(e.message);
       }
     }
     setBusy(false);
   };
   return (
     <Stack space="space.150">
-      <Text>Paste a summary or diff of what was implemented. Spec Guard checks it against the linked specification.</Text>
-      {/* Kontrolsuz alan: "value" vermiyoruz; aksi halde hizli yazimda karakterler kaybolabiliyor */}
-      <TextArea
-        name="change"
-        placeholder="e.g. Added password reset: link valid for 24 hours, sent by email…"
-        onChange={(e) => setChange(e.target.value)}
-      />
+      <Text>Paste a summary or diff of what was implemented. Spec Guard checks it against the linked spec.</Text>
+      {/* Uncontrolled on purpose: a controlled TextArea can drop characters while typing fast. */}
+      <TextArea name="change" placeholder="e.g. Added password reset: link valid for 24 hours, sent by email" onChange={(e) => setChange(e.target.value)} />
       <Inline>
         <LoadingButton appearance="primary" isLoading={busy} isDisabled={!change.trim()} onClick={run}>
           Verify change
         </LoadingButton>
       </Inline>
-      {error ? <SectionMessage appearance="error">{<Text>{error}</Text>}</SectionMessage> : null}
+      {error ? (
+        <SectionMessage appearance="error">
+          <Text>{error}</Text>
+        </SectionMessage>
+      ) : null}
       {result ? (
         <Stack space="space.100">
           <Inline>
@@ -352,14 +320,12 @@ const VerifyView = () => {
             <Box key={i} xcss={card}>
               <Stack space="space.050">
                 <Inline space="space.100">
-                  <Lozenge appearance={f.severity === 'high' ? 'removed' : f.severity === 'medium' ? 'moved' : 'default'}>
-                    {f.severity}
-                  </Lozenge>
+                  <Lozenge appearance={f.severity === 'high' ? 'removed' : f.severity === 'medium' ? 'moved' : 'default'}>{f.severity}</Lozenge>
                   <Strong>{f.requirement}</Strong>
                 </Inline>
                 {f.specQuote ? (
                   <Text>
-                    Spec: <Em>“{f.specQuote}”</Em>
+                    Spec: <Quote text={f.specQuote} verified={f.specQuoteVerified} />
                   </Text>
                 ) : null}
                 <Text>{f.problem}</Text>
@@ -382,6 +348,50 @@ const VerifyView = () => {
   );
 };
 
+/** Lets the user exclude linked pages that are not specs (meeting notes, designs, ...). */
+const SpecPages = ({ status, onChanged }) => {
+  const [busy, setBusy] = useState(null);
+  const toggle = async (pageId, ignored) => {
+    setBusy(pageId);
+    await invoke('setPageIgnored', { pageId, ignored });
+    setBusy(null);
+    onChanged();
+  };
+  const linked = status.linkedPages || [];
+  if (linked.length <= 1 && !linked.some((p) => p.ignored)) {
+    return (
+      <Inline space="space.100" alignBlock="center" shouldWrap>
+        <Text>Spec:</Text>
+        {status.pages.map((p) => (
+          <Link key={p.id} href={p.url || '#'} openNewTab>
+            {p.title} (v{p.version})
+          </Link>
+        ))}
+      </Inline>
+    );
+  }
+  return (
+    <Stack space="space.050">
+      <Text>Linked Confluence pages. Turn off pages that are not specifications:</Text>
+      {linked.map((lp) => {
+        const page = status.pages.find((p) => p.id === lp.id);
+        return (
+          <Inline key={lp.id} space="space.100" alignBlock="center">
+            <Toggle isChecked={!lp.ignored} isDisabled={busy === lp.id} onChange={() => toggle(lp.id, !lp.ignored)} />
+            {page ? (
+              <Link href={page.url || '#'} openNewTab>
+                {page.title} (v{page.version})
+              </Link>
+            ) : (
+              <Text>{lp.ignored ? `Page ${lp.id} (ignored)` : `Page ${lp.id} (not readable)`}</Text>
+            )}
+          </Inline>
+        );
+      })}
+    </Stack>
+  );
+};
+
 const App = () => {
   const [status, setStatus] = useState(null);
   const [error, setError] = useState(null);
@@ -391,24 +401,17 @@ const App = () => {
     const r = await invoke('getStatus');
     if (r.ok) setStatus(r.data);
     else setError(r.error);
+    return r.ok ? r.data : null;
   };
 
-  const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
-
-  /** Analiz arka planda calisir; is bitene kadar birkac saniyede bir durumu sorar. */
-  const waitForJob = async () => {
+  const waitForAnalysis = async () => {
     setRunning(true);
     for (let i = 0; i < 90; i++) {
-      await sleep(i < 5 ? 2000 : 4000);
-      const r = await invoke('getStatus');
-      if (!r.ok) {
-        setError(r.error);
-        break;
-      }
-      const job = r.data.job;
-      if (!job || job.state !== 'running') {
-        setStatus(r.data);
-        if (job && job.state === 'error') setError(`Analysis failed: ${job.error}`);
+      await new Promise((res) => setTimeout(res, i < 5 ? 2000 : 4000));
+      const d = await load();
+      if (!d) break;
+      if (!d.job || d.job.state !== 'running') {
+        if (d.job && d.job.state === 'error') setError(`The check failed: ${d.job.error}`);
         break;
       }
     }
@@ -429,20 +432,24 @@ const App = () => {
       await load();
       return;
     }
-    await waitForJob();
+    await waitForAnalysis();
   };
 
   useEffect(() => {
-    load().then(() => null);
+    load();
   }, []);
 
-  // Panel acildiginda bir analiz hala suruyorsa onu bekle
+  // A check started elsewhere (sidebar, re-check after an edit) is still running: wait for it.
   useEffect(() => {
-    if (status && status.job && status.job.state === 'running' && !running) waitForJob();
+    if (status && status.job && status.job.state === 'running' && !running) waitForAnalysis();
   }, [status && status.job && status.job.state]);
 
   if (error && !status) {
-    return <SectionMessage appearance="error" title="Spec Guard could not load">{<Text>{error}</Text>}</SectionMessage>;
+    return (
+      <SectionMessage appearance="error" title="Spec Guard could not load">
+        <Text>{error}</Text>
+      </SectionMessage>
+    );
   }
   if (!status) return <Spinner label="Loading Spec Guard" />;
 
@@ -451,8 +458,9 @@ const App = () => {
       <Stack space="space.100">
         <EmptyState
           header="No specification linked"
-          description="Link a Confluence page to this work item (or paste its URL in the description). Spec Guard will compare the spec with this work item and warn you when the spec changes."
+          description="Paste the URL of a Confluence page into the description, or link the page to this work item. Spec Guard will then compare the spec with this work item and tell you when the spec changes."
         />
+        {(status.linkedPages || []).some((p) => p.ignored) ? <SpecPages status={status} onChanged={load} /> : null}
         {status.errors.map((e, i) => (
           <SectionMessage key={i} appearance="warning">
             <Text>
@@ -466,15 +474,12 @@ const App = () => {
 
   return (
     <Stack space="space.150">
-      {error ? <SectionMessage appearance="error">{<Text>{error}</Text>}</SectionMessage> : null}
-      <Inline space="space.100" alignBlock="center">
-        <Text>Spec:</Text>
-        {status.pages.map((p) => (
-          <Link key={p.id} href={p.url || '#'} openNewTab>
-            {p.title} (v{p.version})
-          </Link>
-        ))}
-      </Inline>
+      {error ? (
+        <SectionMessage appearance="error">
+          <Text>{error}</Text>
+        </SectionMessage>
+      ) : null}
+      <SpecPages status={status} onChanged={load} />
       <Tabs id="specguard-tabs">
         <TabList>
           <Tab>Alignment</Tab>
@@ -483,13 +488,13 @@ const App = () => {
         <TabPanel>
           <Box padding="space.150">
             {status.analysis ? (
-              <AlignmentView status={status} onRun={run} running={running} />
+              <AlignmentView status={status} onRun={run} onApplied={waitForAnalysis} running={running} />
             ) : (
               <Stack space="space.150">
-                <Heading size="small">Check this work item against its specification</Heading>
+                <Heading size="small">Check this work item against its spec</Heading>
                 <Text>
-                  Spec Guard reads the linked spec, lists the requirements that apply to this work item, and flags anything
-                  missing or contradictory — with quotes from both sides.
+                  Spec Guard reads the linked spec, finds the requirements this work item is responsible for, and flags anything missing or
+                  contradictory, quoting both sides.
                 </Text>
                 <Inline>
                   <LoadingButton appearance="primary" isLoading={running} onClick={run}>

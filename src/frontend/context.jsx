@@ -1,7 +1,6 @@
 /**
- * Jira is gorunumunun sag tarafindaki (ayrintilar) Spec Guard kutusu.
- * Her iste otomatik gorunur: uyum puani, sayilar, "spesifikasyon degisti" uyarisi ve tek tikla kontrol.
- * Ayrintili rapor icin Spec Guard paneli kullanilir.
+ * Spec Guard section in the work item's details sidebar (shown on every work item): score, counts,
+ * an "out of date" warning and a one-click check. The panel shows the full report.
  */
 import React, { useEffect, useState } from 'react';
 import ForgeReconciler, { Inline, LoadingButton, Lozenge, SectionMessage, Spinner, Stack, Text } from '@forge/react';
@@ -30,7 +29,10 @@ const App = () => {
       for (let i = 0; i < 90; i++) {
         await sleep(i < 5 ? 2000 : 4000);
         const d = await load();
-        if (!d || !d.job || d.job.state !== 'running') break;
+        if (!d || !d.job || d.job.state !== 'running') {
+          if (d && d.job && d.job.state === 'error') setError(d.job.error);
+          break;
+        }
       }
     } else await load();
     setRunning(false);
@@ -43,7 +45,7 @@ const App = () => {
   if (error && !status) return <Text>{error}</Text>;
   if (!status) return <Spinner size="small" label="Loading" />;
   if (status.pages.length === 0) {
-    return <Text>No spec linked. Add a Confluence page link to this work item to check it against its specification.</Text>;
+    return <Text>No spec linked. Paste a Confluence page URL into the description to check this work item against it.</Text>;
   }
 
   const a = status.analysis;
@@ -66,7 +68,7 @@ const App = () => {
       )}
       {status.stale ? (
         <SectionMessage appearance="warning">
-          <Text>The spec changed since the last check.</Text>
+          <Text>The spec or this work item changed since the last check.</Text>
         </SectionMessage>
       ) : null}
       {error ? <Text>{error}</Text> : null}
@@ -75,7 +77,7 @@ const App = () => {
           {a ? 'Re-check' : 'Check alignment'}
         </LoadingButton>
       </Inline>
-      {a ? <Text>Open the Spec Guard panel for quotes and details.</Text> : null}
+      {a ? <Text>Quotes, fixes and change verification: Apps button next to the work item title → Spec Guard.</Text> : null}
     </Stack>
   );
 };

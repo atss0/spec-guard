@@ -1,19 +1,34 @@
 /**
- * UI Kit panelinin arka ucu (resolver). Panel bu fonksiyonlari invoke() ile cagirir.
- * Tum Jira/Confluence istekleri kullanicinin yetkileriyle (asUser) yapilir.
+ * Backend for the UI Kit modules (issue panel, issue context, global page, Confluence byline).
+ * All product reads use the current user's permissions.
  */
 import Resolver from '@forge/resolver';
-import { getStatus, requestAnalysis, listAlignment, pageAlignment, requestCoverage, getCoverage, requestVerify, getVerify, requestFix, getFix, applyFix, createGapItems, linkWorkItems } from '../lib/service';
+import {
+  getStatus,
+  requestAnalysis,
+  listAlignment,
+  pageAlignment,
+  requestCoverage,
+  getCoverage,
+  createGapItems,
+  linkWorkItems,
+  startUserJob,
+  getUserJob,
+  applyProposal,
+  setPageIgnored,
+  pollWatchedPages,
+  loadContext,
+} from '../lib/service';
 import { demoTargets, createDemo } from '../lib/demo';
 
 const resolver = new Resolver();
 
-/** Is anahtarini once Forge baglamindan, yoksa istekten alir. */
-const issueKeyOf = (req) =>
-  (req.context && req.context.extension && req.context.extension.issue && req.context.extension.issue.key) ||
-  (req.payload && req.payload.issueKey);
+const ext = (req) => (req.context && req.context.extension) || {};
+const issueKeyOf = (req) => (ext(req).issue && ext(req).issue.key) || (req.payload && req.payload.issueKey);
+const pageIdOf = (req) => ext(req).content && ext(req).content.id;
+const accountOf = (req) => req.context.accountId;
 
-/** Hatalari panelde gosterilebilir bicime cevirir (panel hic cokmesin). */
+/** Returns { ok, data } or { ok: false, error } so the UI never crashes on a failed call. */
 const safe = (fn) => async (req) => {
   try {
     return { ok: true, data: await fn(req) };
@@ -23,26 +38,50 @@ const safe = (fn) => async (req) => {
   }
 };
 
-resolver.define('getStatus', safe((req) => getStatus(issueKeyOf(req), 'user')));
-resolver.define('runAnalysis', safe((req) => requestAnalysis(issueKeyOf(req), req.context.accountId)));
-resolver.define('verifyChange', safe((req) => requestVerify(issueKeyOf(req), req.payload.change, req.context.accountId)));
-resolver.define('getVerify', safe((req) => getVerify(issueKeyOf(req), req.context.accountId)));
+/** Throws unless the user can read at least one spec page linked to the work item. */
+async function requireSpec(req) {
+  const { pages } = await loadContext(issueKeyOf(req), 'user');
+  if (!pages.length) throw new Error('No readable specification page is linked to this work item.');
+}
 
-resolver.define('listAlignment', safe(() => listAlignment()));
+// Issue panel and issue context
+resolver.define('getStatus', safe((req) => getStatus(issueKeyOf(req), 'user')));
+resolver.define('runAnalysis', safe((req) => requestAnalysis(issueKeyOf(req), accountOf(req))));
+resolver.define('setPageIgnored', safe((req) => setPageIgnored(issueKeyOf(req), req.payload.pageId, Boolean(req.payload.ignored))));
+
 resolver.define(
-  'pageAlignment',
-  safe((req) => pageAlignment(req.context && req.context.extension && req.context.extension.content && req.context.extension.content.id))
+  'verifyChange',
+  safe(async (req) => {
+    const change = String(req.payload.change || '').trim();
+    if (!change) throw new Error('Describe the change first.');
+    await requireSpec(req);
+    await startUserJob('verify', issueKeyOf(req), accountOf(req), { change: change.slice(0, 40000) });
+    return { queued: true };
+  })
+);
+resolver.define('getVerify', safe((req) => getUserJob('verify', issueKeyOf(req), accountOf(req))));
+
+resolver.define(
+  'requestFix',
+  safe(async (req) => {
+    await requireSpec(req);
+    await startUserJob('fix', issueKeyOf(req), accountOf(req));
+    return { queued: true };
+  })
+);
+resolver.define('getFix', safe((req) => getUserJob('fix', issueKeyOf(req), accountOf(req))));
+resolver.define(
+  'applyFix',
+  safe(async (req) => {
+    const job = await getUserJob('fix', issueKeyOf(req), accountOf(req));
+    if (!job || job.state !== 'done') throw new Error('There is no proposal to apply. Click "Align work item with spec" first.');
+    return applyProposal(issueKeyOf(req), job.result, 'user', accountOf(req));
+  })
 );
 
-const pageIdOf = (req) => req.context && req.context.extension && req.context.extension.content && req.context.extension.content.id;
-resolver.define('requestCoverage', safe((req) => requestCoverage(pageIdOf(req), req.context.accountId)));
-resolver.define('getCoverage', safe((req) => getCoverage(pageIdOf(req))));
-
-resolver.define('requestFix', safe((req) => requestFix(issueKeyOf(req), req.context.accountId)));
-resolver.define('getFix', safe((req) => getFix(issueKeyOf(req), req.context.accountId)));
-resolver.define('applyFix', safe((req) => applyFix(issueKeyOf(req), req.context.accountId)));
-resolver.define('createGapItems', safe((req) => createGapItems(pageIdOf(req), (req.payload && req.payload.reqIds) || null, 'user')));
-
+// Global page
+resolver.define('listAlignment', safe(() => listAlignment()));
+resolver.define('checkSpecsNow', safe(() => pollWatchedPages()));
 resolver.define('demoTargets', safe(() => demoTargets()));
 resolver.define(
   'createDemo',
@@ -52,5 +91,11 @@ resolver.define(
     return r;
   })
 );
+
+// Confluence byline
+resolver.define('pageAlignment', safe((req) => pageAlignment(pageIdOf(req))));
+resolver.define('requestCoverage', safe((req) => requestCoverage(pageIdOf(req), accountOf(req))));
+resolver.define('getCoverage', safe((req) => getCoverage(pageIdOf(req))));
+resolver.define('createGapItems', safe((req) => createGapItems(pageIdOf(req), (req.payload && req.payload.reqIds) || null, 'user')));
 
 export const handler = resolver.getDefinitions();

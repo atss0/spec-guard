@@ -1,0 +1,299 @@
+{
+ "summary": {
+  "runs": 3,
+  "conflictRecall": "11/12",
+  "falseConflicts": 0,
+  "falseMissing": 0,
+  "scoreSpreadPerItem": {
+   "PLAT-33518": 5,
+   "PLAT-33519": 0,
+   "PLAT-33520": 0,
+   "PLAT-33521": 0
+  },
+  "quotesVerified": "107/107",
+  "medianLatencyMs": 14166,
+  "coverage": [
+   {
+    "run": 1,
+    "totals": {
+     "conflict": 4,
+     "covered": 3,
+     "gap": 0,
+     "partial": 0,
+     "total": 7
+    },
+    "conflictIds": [
+     "NT-2",
+     "NT-3",
+     "NT-4",
+     "NT-6"
+    ],
+    "gaps": []
+   },
+   {
+    "run": 2,
+    "totals": {
+     "conflict": 4,
+     "covered": 3,
+     "gap": 0,
+     "partial": 0,
+     "total": 7
+    },
+    "conflictIds": [
+     "NT-2",
+     "NT-3",
+     "NT-4",
+     "NT-6"
+    ],
+    "gaps": []
+   },
+   {
+    "run": 3,
+    "totals": {
+     "conflict": 4,
+     "covered": 3,
+     "gap": 0,
+     "partial": 0,
+     "total": 7
+    },
+    "conflictIds": [
+     "NT-2",
+     "NT-3",
+     "NT-4",
+     "NT-6"
+    ],
+    "gaps": []
+   }
+  ]
+ },
+ "rows": [
+  {
+   "key": "PLAT-33518",
+   "run": 1,
+   "ms": 17133,
+   "score": 20,
+   "detected": 2,
+   "expected": 3,
+   "falseConflicts": [],
+   "falseMissing": [],
+   "statuses": {
+    "NT-2": "missing",
+    "NT-3": "conflict",
+    "NT-4": "conflict",
+    "NT-1": "covered",
+    "NT-5": "elsewhere",
+    "NT-6": "elsewhere",
+    "NT-7": "elsewhere"
+   }
+  },
+  {
+   "key": "PLAT-33518",
+   "run": 2,
+   "ms": 14570,
+   "score": 25,
+   "detected": 3,
+   "expected": 3,
+   "falseConflicts": [],
+   "falseMissing": [],
+   "statuses": {
+    "NT-2": "conflict",
+    "NT-3": "conflict",
+    "NT-4": "conflict",
+    "NT-1": "covered",
+    "NT-5": "elsewhere",
+    "NT-6": "elsewhere",
+    "NT-7": "elsewhere"
+   }
+  },
+  {
+   "key": "PLAT-33518",
+   "run": 3,
+   "ms": 16117,
+   "score": 25,
+   "detected": 3,
+   "expected": 3,
+   "falseConflicts": [],
+   "falseMissing": [],
+   "statuses": {
+    "NT-2": "conflict",
+    "NT-3": "conflict",
+    "NT-4": "conflict",
+    "NT-1": "covered",
+    "NT-5": "elsewhere",
+    "NT-6": "elsewhere",
+    "NT-7": "elsewhere"
+   }
+  },
+  {
+   "key": "PLAT-33519",
+   "run": 1,
+   "ms": 14896,
+   "score": 100,
+   "detected": 0,
+   "expected": 0,
+   "falseConflicts": [],
+   "falseMissing": [],
+   "statuses": {
+    "NT-5": "covered",
+    "NT-1": "elsewhere",
+    "NT-2": "elsewhere",
+    "NT-3": "elsewhere",
+    "NT-4": "elsewhere",
+    "NT-6": "elsewhere",
+    "NT-7": "elsewhere"
+   }
+  },
+  {
+   "key": "PLAT-33519",
+   "run": 2,
+   "ms": 12858,
+   "score": 100,
+   "detected": 0,
+   "expected": 0,
+   "falseConflicts": [],
+   "falseMissing": [],
+   "statuses": {
+    "NT-5": "covered",
+    "NT-1": "elsewhere",
+    "NT-2": "elsewhere",
+    "NT-3": "elsewhere",
+    "NT-4": "elsewhere",
+    "NT-6": "elsewhere",
+    "NT-7": "elsewhere"
+   }
+  },
+  {
+   "key": "PLAT-33519",
+   "run": 3,
+   "ms": 14776,
+   "score": 100,
+   "detected": 0,
+   "expected": 0,
+   "falseConflicts": [],
+   "falseMissing": [],
+   "statuses": {
+    "NT-5": "covered",
+    "NT-1": "elsewhere",
+    "NT-2": "elsewhere",
+    "NT-3": "elsewhere",
+    "NT-4": "elsewhere",
+    "NT-6": "elsewhere",
+    "NT-7": "elsewhere"
+   }
+  },
+  {
+   "key": "PLAT-33520",
+   "run": 1,
+   "ms": 14166,
+   "score": 0,
+   "detected": 1,
+   "expected": 1,
+   "falseConflicts": [],
+   "falseMissing": [],
+   "statuses": {
+    "NT-6": "conflict",
+    "NT-1": "elsewhere",
+    "NT-2": "elsewhere",
+    "NT-3": "elsewhere",
+    "NT-4": "elsewhere",
+    "NT-5": "elsewhere",
+    "NT-7": "elsewhere"
+   }
+  },
+  {
+   "key": "PLAT-33520",
+   "run": 2,
+   "ms": 12844,
+   "score": 0,
+   "detected": 1,
+   "expected": 1,
+   "falseConflicts": [],
+   "falseMissing": [],
+   "statuses": {
+    "NT-6": "conflict",
+    "NT-1": "elsewhere",
+    "NT-2": "elsewhere",
+    "NT-3": "elsewhere",
+    "NT-4": "elsewhere",
+    "NT-5": "elsewhere",
+    "NT-7": "elsewhere"
+   }
+  },
+  {
+   "key": "PLAT-33520",
+   "run": 3,
+   "ms": 13098,
+   "score": 0,
+   "detected": 1,
+   "expected": 1,
+   "falseConflicts": [],
+   "falseMissing": [],
+   "statuses": {
+    "NT-6": "conflict",
+    "NT-1": "elsewhere",
+    "NT-2": "elsewhere",
+    "NT-3": "elsewhere",
+    "NT-4": "elsewhere",
+    "NT-5": "elsewhere",
+    "NT-7": "elsewhere"
+   }
+  },
+  {
+   "key": "PLAT-33521",
+   "run": 1,
+   "ms": 13043,
+   "score": 100,
+   "detected": 0,
+   "expected": 0,
+   "falseConflicts": [],
+   "falseMissing": [],
+   "statuses": {
+    "NT-7": "covered",
+    "NT-1": "elsewhere",
+    "NT-2": "elsewhere",
+    "NT-3": "elsewhere",
+    "NT-4": "elsewhere",
+    "NT-5": "elsewhere",
+    "NT-6": "elsewhere"
+   }
+  },
+  {
+   "key": "PLAT-33521",
+   "run": 2,
+   "ms": 13416,
+   "score": 100,
+   "detected": 0,
+   "expected": 0,
+   "falseConflicts": [],
+   "falseMissing": [],
+   "statuses": {
+    "NT-7": "covered",
+    "NT-1": "elsewhere",
+    "NT-2": "elsewhere",
+    "NT-3": "elsewhere",
+    "NT-4": "elsewhere",
+    "NT-5": "elsewhere",
+    "NT-6": "elsewhere"
+   }
+  },
+  {
+   "key": "PLAT-33521",
+   "run": 3,
+   "ms": 11546,
+   "score": 100,
+   "detected": 0,
+   "expected": 0,
+   "falseConflicts": [],
+   "falseMissing": [],
+   "statuses": {
+    "NT-7": "covered",
+    "NT-1": "elsewhere",
+    "NT-2": "elsewhere",
+    "NT-3": "elsewhere",
+    "NT-4": "elsewhere",
+    "NT-5": "elsewhere",
+    "NT-6": "elsewhere"
+   }
+  }
+ ]
+}

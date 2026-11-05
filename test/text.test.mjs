@@ -71,3 +71,40 @@ test('gapIssueAdf links the spec and quotes the requirement', () => {
   assert.match(t, /GC-4/);
   assert.match(t, /The page offers X/);
 });
+
+import { clipBytes, findAcceptanceCriteriaStart } from '../src/lib/text.js';
+
+test('clipBytes caps by UTF-8 bytes without splitting characters', () => {
+  const tr = 'ğüşıöç'.repeat(100); // 2 bytes per character
+  const out = clipBytes(tr, 101);
+  assert.ok(Buffer.byteLength(out, 'utf8') <= 101);
+  assert.ok(!out.includes('\uFFFD'));
+  assert.equal(clipBytes('abc', 10), 'abc');
+});
+
+test('acceptance criteria are found under a heading or a bold label, never under "Requirements"', () => {
+  const bold = { type: 'paragraph', content: [{ type: 'text', text: 'Acceptance criteria:', marks: [{ type: 'strong' }] }] };
+  const req = { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Technical requirements' }] };
+  assert.equal(findAcceptanceCriteriaStart([p('story'), req, p('x'), bold, p('a')]), 3);
+  assert.equal(findAcceptanceCriteriaStart([p('story'), req, p('x')]), -1);
+});
+
+test('replaceAcceptanceCriteria keeps a "Requirements" section and stops at the next label', () => {
+  const adf = {
+    type: 'doc',
+    version: 1,
+    content: [
+      { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Requirements' }] },
+      p('keep this'),
+      { type: 'paragraph', content: [{ type: 'text', text: 'Acceptance criteria:', marks: [{ type: 'strong' }] }] },
+      p('old criterion'),
+      p('Notes:'),
+      p('keep notes'),
+    ],
+  };
+  const text = adfToText(replaceAcceptanceCriteria(adf, ['new'], 'note'));
+  assert.match(text, /### Requirements\nkeep this/);
+  assert.match(text, /Acceptance criteria:\n- new\nnote/);
+  assert.doesNotMatch(text, /old criterion/);
+  assert.match(text, /Notes:\nkeep notes/);
+});

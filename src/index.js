@@ -1,4 +1,14 @@
-// Manifest'teki "handler: index.<ad>" girisleri buradan disa aktarilir.
+// Function handlers referenced from manifest.yml as index.<name>.
 export { handler } from './resolvers';
-export { getSpecContextAction, checkAlignmentAction, verifyChangeAction, getAlignmentStatusAction, getSpecCoverageAction, alignWorkItemAction, createGapItemsAction } from './actions';
-export { pageUpdated, jobWorker, pollSpecs } from './triggers';
+export {
+  getSpecContextAction,
+  checkAlignmentAction,
+  verifyChangeAction,
+  getAlignmentStatusAction,
+  getSpecCoverageAction,
+  alignWorkItemAction,
+  applyAlignmentAction,
+  createGapItemsAction,
+  getJobResultAction,
+} from './actions';
+export { pageUpdated, issueChanged, jobWorker, pollSpecs } from './triggers';
