@@ -1,54 +1,19 @@
 {
  "summary": {
   "runs": 3,
-  "conflictRecall": "11/12",
-  "falseConflicts": 0,
+  "conflictRecall": "12/12",
+  "falseConflicts": 1,
   "falseMissing": 0,
   "scoreSpreadPerItem": {
-   "PLAT-33518": 5,
-   "PLAT-33519": 0,
+   "PLAT-33518": 0,
+   "PLAT-33519": 50,
    "PLAT-33520": 0,
    "PLAT-33521": 0
   },
-  "quotesVerified": "107/107",
-  "medianLatencyMs": 14166,
+  "quotesVerified": "105/105",
+  "medianLatencyMs": 13681,
   "coverage": [
    {
-    "run": 1,
-    "totals": {
-     "conflict": 4,
-     "covered": 3,
-     "gap": 0,
-     "partial": 0,
-     "total": 7
-    },
-    "conflictIds": [
-     "NT-2",
-     "NT-3",
-     "NT-4",
-     "NT-6"
-    ],
-    "gaps": []
-   },
-   {
-    "run": 2,
-    "totals": {
-     "conflict": 4,
-     "covered": 3,
-     "gap": 0,
-     "partial": 0,
-     "total": 7
-    },
-    "conflictIds": [
-     "NT-2",
-     "NT-3",
-     "NT-4",
-     "NT-6"
-    ],
-    "gaps": []
-   },
-   {
-    "run": 3,
     "totals": {
      "conflict": 4,
      "covered": 3,
@@ -70,14 +35,14 @@
   {
    "key": "PLAT-33518",
    "run": 1,
-   "ms": 17133,
-   "score": 20,
-   "detected": 2,
+   "ms": 17589,
+   "score": 25,
+   "detected": 3,
    "expected": 3,
    "falseConflicts": [],
    "falseMissing": [],
    "statuses": {
-    "NT-2": "missing",
+    "NT-2": "conflict",
     "NT-3": "conflict",
     "NT-4": "conflict",
     "NT-1": "covered",
@@ -89,7 +54,7 @@
   {
    "key": "PLAT-33518",
    "run": 2,
-   "ms": 14570,
+   "ms": 16260,
    "score": 25,
    "detected": 3,
    "expected": 3,
@@ -108,7 +73,7 @@
   {
    "key": "PLAT-33518",
    "run": 3,
-   "ms": 16117,
+   "ms": 16162,
    "score": 25,
    "detected": 3,
    "expected": 3,
@@ -127,7 +92,7 @@
   {
    "key": "PLAT-33519",
    "run": 1,
-   "ms": 14896,
+   "ms": 13224,
    "score": 100,
    "detected": 0,
    "expected": 0,
@@ -146,7 +111,7 @@
   {
    "key": "PLAT-33519",
    "run": 2,
-   "ms": 12858,
+   "ms": 13215,
    "score": 100,
    "detected": 0,
    "expected": 0,
@@ -165,17 +130,19 @@
   {
    "key": "PLAT-33519",
    "run": 3,
-   "ms": 14776,
-   "score": 100,
+   "ms": 14567,
+   "score": 50,
    "detected": 0,
    "expected": 0,
-   "falseConflicts": [],
+   "falseConflicts": [
+    "NT-3"
+   ],
    "falseMissing": [],
    "statuses": {
     "NT-5": "covered",
+    "NT-3": "conflict",
     "NT-1": "elsewhere",
     "NT-2": "elsewhere",
-    "NT-3": "elsewhere",
     "NT-4": "elsewhere",
     "NT-6": "elsewhere",
     "NT-7": "elsewhere"
@@ -184,7 +151,7 @@
   {
    "key": "PLAT-33520",
    "run": 1,
-   "ms": 14166,
+   "ms": 13133,
    "score": 0,
    "detected": 1,
    "expected": 1,
@@ -203,7 +170,7 @@
   {
    "key": "PLAT-33520",
    "run": 2,
-   "ms": 12844,
+   "ms": 13413,
    "score": 0,
    "detected": 1,
    "expected": 1,
@@ -222,7 +189,7 @@
   {
    "key": "PLAT-33520",
    "run": 3,
-   "ms": 13098,
+   "ms": 13294,
    "score": 0,
    "detected": 1,
    "expected": 1,
@@ -241,7 +208,7 @@
   {
    "key": "PLAT-33521",
    "run": 1,
-   "ms": 13043,
+   "ms": 14841,
    "score": 100,
    "detected": 0,
    "expected": 0,
@@ -260,7 +227,7 @@
   {
    "key": "PLAT-33521",
    "run": 2,
-   "ms": 13416,
+   "ms": 13681,
    "score": 100,
    "detected": 0,
    "expected": 0,
@@ -279,7 +246,7 @@
   {
    "key": "PLAT-33521",
    "run": 3,
-   "ms": 11546,
+   "ms": 13047,
    "score": 100,
    "detected": 0,
    "expected": 0,

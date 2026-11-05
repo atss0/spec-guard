@@ -35,7 +35,7 @@ Design choices aimed at trust:
 - Changes to work item content are always proposed first and applied only after the user approves; agents cannot apply a proposal made for someone else, and agent actions refuse to run without a known user.
 
 ## Evaluation
-On a seeded spec with 4 planted conflicts across 4 work items, analysed 3 times each: 11 of 12 conflicts found, 0 false conflicts, 0 false "missing" findings, 107 of 107 quotes found word for word in the sources, median 14 seconds per analysis. Details and limitations: docs/EVALUATION.md in the repository.
+On a seeded spec with 4 planted conflicts across 4 work items, analysed 3 times each, in two runs: 11 and 12 of 12 conflicts found, 0 and 1 false conflicts, no false "missing" findings, every checked quote found word for word in the sources (105 of 105 in the latest run), median 14 seconds per analysis. It is a smoke test, not a benchmark. Details and limitations: docs/EVALUATION.md in the repository.
 
 ## Challenges we ran into
 - Background jobs that read Confluence as the app user failed on restricted spaces. Offline user impersonation fixed that and made the permission model simpler.
