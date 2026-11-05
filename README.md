@@ -15,7 +15,7 @@ Spec Guard treats the spec as the source of truth and checks everything downstre
 ## Features
 
 **On a Jira work item**
-- **Alignment report.** Spec Guard reads the linked spec, decides which requirements this work item is responsible for, and marks each one as covered, missing, conflicting, unclear, or delivered by another work item. Every finding quotes the spec and the work item, and every quote is checked against its source. Quotes not found word for word are flagged; a quote shortened with "..." only counts if each piece is at least 10 characters long and the pieces are close together in the source.
+- **Alignment report.** Spec Guard reads the linked spec, decides which requirements this work item is responsible for, and marks each one as covered, missing, conflicting, unclear, or delivered by another work item. Every finding quotes the spec and the work item, and every quote is checked against its source. Quotes not found word for word are flagged. Single words or numbers do not count as verified, a quote shortened with "..." only counts if each piece is at least 10 characters long and the pieces are close together, and a conflict whose spec quote cannot be found is shown as "unclear" and not counted.
 - **Align work item with spec.** Proposes acceptance criteria with the spec's values. You review the changes, then apply them. Only the acceptance criteria section of the description is replaced, and a comment records what changed.
 - **Verify a change.** Paste a summary or diff of what was implemented. The verdict (pass, needs attention, fails spec) judges the change only; problems in the work item itself are listed separately.
 - **Sidebar status** on every work item, and automatic re-check when the description is edited.
@@ -72,8 +72,9 @@ Who each request runs as:
 - Comments written to Jira never contain spec text.
 - Spec and work item text is passed to the model inside data tags, and the model is told not to follow instructions in it.
 - Agent actions refuse to run when the calling user cannot be identified, so they never fall back to the app's permissions.
-- Changes to work item content need a user action: aligning a work item is propose, then apply (single use, same user, 24 hours, refused if the work item changed in between). Creating gap work items from an agent is two calls, the second with `confirm: true`. Automatic writes are limited to the spec-change comment, the JQL property and refreshed reports.
-- Each user can start up to 60 LLM jobs per hour, and a check that is already running is not started twice.
+- Changes to work item content need a user action: aligning a work item is propose, then apply (single use, same user, 24 hours, refused if the work item changed in between). Creating gap work items from an agent is two calls: the first returns a preview and a `previewId`, the second creates exactly the previewed set, only for the same user and only if the coverage map has not changed. Automatic writes are limited to the spec-change comment, the JQL property and refreshed reports.
+- Each user can start up to 60 checks, verifications and coverage maps per hour, and one that is already running is not started twice. The *Check specs for changes* button can be used once every 10 minutes per site.
+- Switching a linked page off ("not a spec") needs edit permission on the work item.
 
 ## Evaluation
 

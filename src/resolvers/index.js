@@ -81,7 +81,7 @@ resolver.define(
 
 // Global page
 resolver.define('listAlignment', safe(() => listAlignment()));
-resolver.define('checkSpecsNow', safe(() => pollWatchedPages({ budgetMs: 20000 })));
+resolver.define('checkSpecsNow', safe(() => pollWatchedPages({ budgetMs: 20000, manual: true })));
 resolver.define('demoTargets', safe(() => demoTargets()));
 resolver.define(
   'createDemo',

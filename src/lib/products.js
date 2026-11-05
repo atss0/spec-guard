@@ -88,6 +88,16 @@ export async function canReadPage(pageId, as = 'user') {
   }
 }
 
+/** True if the user may edit the work item. */
+export async function canEditIssue(issueKey, as = 'user') {
+  try {
+    const r = await json(await client(as).requestJira(route`/rest/api/3/mypermissions?issueKey=${issueKey}&permissions=EDIT_ISSUES`), 'Checking permissions');
+    return Boolean(r && r.permissions && r.permissions.EDIT_ISSUES && r.permissions.EDIT_ISSUES.havePermission);
+  } catch (e) {
+    return false;
+  }
+}
+
 /** Current version number of a page, or null if it cannot be read. */
 export async function pageVersion(pageId, as = 'user') {
   try {

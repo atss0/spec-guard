@@ -73,9 +73,10 @@ export const createGapItemsAction = wrap(async (payload, context) => {
   const ids = String(payload.requirementIds || '')
     .split(/[,\s]+/)
     .filter(Boolean);
-  accountIdFrom(payload, context);
-  const confirm = payload.confirm === true || String(payload.confirm).toLowerCase() === 'true';
-  return createGapItems(pageId, ids.length ? ids : null, 'user', { confirm });
+  const accountId = accountIdFrom(payload, context);
+  const previewId = String(payload.previewId || '').trim();
+  // Without a preview id nothing is created; with one, exactly the previewed set is created.
+  return createGapItems(pageId, ids.length ? ids : null, 'user', { confirm: Boolean(previewId), previewId: previewId || null, previewOwner: accountId });
 });
 
 /** Collects the result of a job that was still running when an action returned. */

@@ -26,6 +26,7 @@ import {
   createIssue,
   findItemsLinkingPage,
   setAlignmentProperty,
+  canEditIssue,
 } from './products.js';
 import { replaceAcceptanceCriteria, gapIssueAdf, clipBytes } from './text.js';
 import { analyzeAlignment, verifyChange, summarizeSpecDiff, buildCoverageMap, proposeWorkItemFix } from './ai.js';
@@ -81,7 +82,7 @@ const isRunning = (job) => { const j = normalizeJob(job); return Boolean(j && j.
 const HOURLY_LLM_JOBS_PER_USER = 60;
 /** Simple per-user hourly budget for LLM work started by people or agents. */
 async function takeQuota(accountId) {
-  if (!accountId) return;
+  if (!accountId) throw new Error('Spec Guard could not identify the current user.');
   const key = `quota:${accountId}:${now().slice(0, 13)}`;
   const used = (await kvs.get(key)) || 0;
   if (used >= HOURLY_LLM_JOBS_PER_USER) throw new Error('Spec Guard hourly limit reached for this user. Try again later.');
@@ -210,6 +211,7 @@ export async function loadContext(issueKey, as = 'user') {
 /** Marks a linked Confluence page as "not a spec" (or a spec again) for one work item. */
 export async function setPageIgnored(issueKey, pageId, ignored) {
   await getIssue(issueKey, 'user'); // permission check
+  if (!(await canEditIssue(issueKey, 'user'))) throw new Error('Only people who can edit this work item can change which pages are specs.');
   // Switching a page off affects everyone's report, so only someone who can read the page may do it.
   if (!(await canReadPage(pageId, 'user'))) throw new Error('You cannot read this page.');
   const list = new Set((await kvs.get(`ignore:${issueKey}`)) || []);
@@ -227,6 +229,23 @@ function readableAnalysis(saved, pages) {
   if (!saved) return null;
   const readable = new Set(pages.map((p) => p.id));
   return (saved.pages || []).every((p) => readable.has(p.id)) ? saved : null;
+}
+
+/**
+ * Findings can name other work items ("delivered by KAN-5") and describe them. Those details are
+ * removed for a viewer who cannot see that work item.
+ */
+async function hideUnseenSiblings(result, as) {
+  if (!result || !Array.isArray(result.requirements)) return result;
+  const keys = [...new Set(result.requirements.map((r) => r.coveredBy).filter(Boolean))];
+  if (!keys.length) return result;
+  const visible = new Set((await visibleIssueKeys(keys, as)).map((v) => v.key));
+  return {
+    ...result,
+    requirements: result.requirements.map((r) =>
+      r.coveredBy && !visible.has(r.coveredBy) ? { ...r, coveredBy: '', explanation: 'Delivered by a work item you cannot see.' } : r
+    ),
+  };
 }
 
 function counts(result) {
@@ -257,7 +276,7 @@ export async function getStatus(issueKey, as = 'user') {
     pages: pages.map(pageRef),
     linkedPages: allLinked,
     errors,
-    analysis: saved ? saved.result : null,
+    analysis: saved ? await hideUnseenSiblings(saved.result, as) : null,
     analyzedAt: saved ? saved.analyzedAt : null,
     stale: Boolean(saved) && reasons.length > 0,
     staleReasons: reasons,
@@ -271,6 +290,13 @@ export async function getStatus(issueKey, as = 'user') {
 export async function runAnalysis(issueKey, as = 'user') {
   const { issue, pages, errors } = await loadContext(issueKey, as);
   if (pages.length === 0) return { issueKey, pages: [], errors, analysis: null, noSpec: true };
+  // The report is shared. If it was built from a page this user cannot read, a re-check by them
+  // would replace it with a weaker one, so it is refused.
+  const previous = await kvs.get(`analysis:${issueKey}`);
+  const unreadable = new Set(errors.map((e) => String(e.pageId)));
+  if (previous && (previous.pages || []).some((p) => unreadable.has(String(p.id)))) {
+    throw new Error('The current report uses a spec page you cannot read, so it was not replaced. Ask someone with access to re-check.');
+  }
   const siblings = await loadSiblings(issueKey, pages, as);
   const result = await analyzeAlignment(issue, pages, siblings);
   const record = { analyzedAt: now(), issueHash: hashIssue(issue), pages: pages.map(pageRef), result, pendingChanges: [] };
@@ -296,8 +322,14 @@ async function syncProperty(issueKey, result, specChanged) {
 
 /** Panel button: checks permissions as the user, then runs the analysis in the background. */
 export async function requestAnalysis(issueKey, accountId) {
-  const { pages } = await loadContext(issueKey, 'user');
+  if (!accountId) throw new Error('Spec Guard could not identify the current user.');
+  const { pages, errors } = await loadContext(issueKey, 'user');
   if (pages.length === 0) return { queued: false, noSpec: true };
+  const previous = await kvs.get(`analysis:${issueKey}`);
+  const unreadable = new Set(errors.map((e) => String(e.pageId)));
+  if (previous && (previous.pages || []).some((p) => unreadable.has(String(p.id)))) {
+    throw new Error('The current report uses a spec page you cannot read, so it was not replaced. Ask someone with access to re-check.');
+  }
   if (isRunning(await kvs.get(`job:${issueKey}`))) return { queued: false, alreadyRunning: true };
   await takeQuota(accountId);
   await kvs.set(`job:${issueKey}`, runningJob());
@@ -334,7 +366,7 @@ export async function getSpecContext(issueKey, as = 'user') {
   return {
     issue: { key: issue.key, summary: issue.summary, status: issue.status, type: issue.type, description: issue.description },
     specPages: pages.map((p) => ({ ...pageRef(p), text: p.text.slice(0, 30000) })),
-    lastAnalysis: saved ? { analyzedAt: saved.analyzedAt, ...saved.result } : null,
+    lastAnalysis: saved ? { analyzedAt: saved.analyzedAt, ...(await hideUnseenSiblings(saved.result, as)) } : null,
     guidance,
     errors,
   };
@@ -406,16 +438,26 @@ export async function onPageUpdated(pageId, actor = 'app') {
       await kvs.set(marker, now());
       notified++;
     } catch (e) {
+      if (e.status === 404 || e.status === 403) {
+        // Deleted, or not visible to the app: nothing to notify. Drop the link so it is not retried.
+        await kvs.set(marker, now());
+        await unregisterLink(pageId, issueKey);
+        continue;
+      }
       failed++;
       console.error(`notify ${issueKey} failed`, e.message);
     }
   }
   // If any work item could not be handled, put the old snapshot back so the hourly check retries.
   // Work items that were already handled are skipped through their markers.
-  if (failed) {
+  const attemptsKey = `attempts:${pageId}:${page.version}`;
+  const attempts = ((await kvs.get(attemptsKey)) || 0) + 1;
+  if (failed && attempts < 3) {
+    await kvs.set(attemptsKey, attempts);
     await safeSet(`snapshot:${pageId}`, snapshot);
     await kvs.set(`snapver:${pageId}`, { version: snapshot.version, accountId: snapshot.accountId });
   }
+  await kvs.delete(`lock:page:${pageId}`);
   return { notified, failed };
 }
 
@@ -423,7 +465,12 @@ export async function onPageUpdated(pageId, actor = 'app') {
  * Checks every spec Spec Guard has seen for a newer version (fallback for missed events; also behind
  * the "Check specs for changes" button). Each page is read as the user who last analysed it.
  */
-export async function pollWatchedPages({ budgetMs = 8 * 60 * 1000 } = {}) {
+export async function pollWatchedPages({ budgetMs = 8 * 60 * 1000, manual = false } = {}) {
+  if (manual) {
+    const last = await kvs.get('poll:manual');
+    if (last && Date.now() - new Date(last).getTime() < 10 * 60 * 1000) return { queued: 0, throttled: true };
+    await kvs.set('poll:manual', now());
+  }
   const started = Date.now();
   let queued = 0;
   const seen = new Set();
@@ -485,12 +532,13 @@ export async function listAlignment() {
   const rows = (await listByPrefix('analysis:')).map((r) => summaryRow(r.key.slice('analysis:'.length), r.value));
   if (rows.length === 0) return { rows: [] };
   const details = new Map((await visibleIssueKeys(rows.map((r) => r.issueKey))).map((v) => [v.key, v]));
-  const pageIds = [...new Set(rows.filter((r) => details.has(r.issueKey)).flatMap((r) => r.pages.map((p) => p.id)))].slice(0, 100);
+  const candidates = rows.filter((r) => details.has(r.issueKey)).sort((a, b) => b.conflicts - a.conflicts).slice(0, 200);
+  const pageIds = [...new Set(candidates.flatMap((r) => r.pages.map((p) => p.id)))];
   const readable = new Set();
   await Promise.all(pageIds.map(async (id) => (await canReadPage(id)) && readable.add(id)));
   return {
     rows: rows
-      .filter((r) => details.has(r.issueKey) && r.pages.every((p) => readable.has(p.id)))
+      .filter((r) => candidates.includes(r) && r.pages.every((p) => readable.has(p.id)))
       .map((r) => ({ ...r, summary: details.get(r.issueKey).summary, status: details.get(r.issueKey).status }))
       .sort((a, b) => b.conflicts - a.conflicts || (a.score ?? 101) - (b.score ?? 101)),
   };
@@ -523,7 +571,10 @@ export async function runCoverage(pageId, as = 'app') {
 
 /** Byline button: checks the user can read the page, then builds the map in the background. */
 export async function requestCoverage(pageId, accountId) {
+  if (!accountId) throw new Error('Spec Guard could not identify the current user.');
   if (!(await canReadPage(pageId, 'user'))) throw new Error('You cannot read this page.');
+  if (isRunning(await kvs.get(`covjob:${pageId}`))) return { queued: false, alreadyRunning: true };
+  await takeQuota(accountId);
   await kvs.set(`covjob:${pageId}`, runningJob());
   await queue.push({ body: { type: 'coverage', pageId: String(pageId), accountId } });
   return { queued: true };
@@ -544,6 +595,9 @@ export async function getCoverage(pageId) {
     stale: (current !== null && current !== rec.pageVersion) || watchers.some((k) => !rec.items.some((i) => i.key === k) && !(rec.considered || []).includes(k)),
     coverage: {
       ...rec,
+      considered: undefined,
+      // The overall summary can describe work items this user cannot see.
+      summary: rec.items.every((i) => visible.has(i.key)) ? rec.summary : '',
       items: rec.items.filter((i) => visible.has(i.key)),
       // The note can describe work items this user cannot see; drop it when any were hidden.
       requirements: rec.requirements.map((q) => {
@@ -585,25 +639,42 @@ export async function specCoverageFor(ref, accountId) {
 /** Gap identity: the requirement's spec text, because model-made ids (R1, R2, ...) can shift between rebuilds. */
 const gapId = (pageId, q) => `gapitem:${pageId}:${hashText(normalizeForMatch(q.specQuote || q.requirement))}`;
 
-export async function createGapItems(pageId, reqIds, as = 'user', { confirm = true } = {}) {
+export async function createGapItems(pageId, reqIds, as = 'user', { confirm = true, previewId = null, previewOwner = null } = {}) {
   if (!(await canReadPage(pageId, as))) throw new Error('You cannot read this page.');
   const rec = await kvs.get(`coverage:${pageId}`);
   if (!rec) throw new Error('Build the coverage map first.');
-  const wanted = reqIds && reqIds.length ? new Set(reqIds.map((x) => String(x).trim().toUpperCase())) : null;
+  const currentVersion = await pageVersion(pageId, as);
+  if (currentVersion !== null && currentVersion !== rec.pageVersion) {
+    throw new Error('The spec changed since the coverage map was built. Rebuild the map first, so work items are only created for current gaps.');
+  }
+  let wanted = reqIds && reqIds.length ? new Set(reqIds.map((x) => String(x).trim().toUpperCase())) : null;
+  if (previewId) {
+    const pv = await kvs.get(`gappreview:${String(previewId).trim()}`);
+    if (!pv || pv.pageId !== String(pageId)) throw new Error('Unknown preview id. Call create-gap-work-items without previewId first.');
+    if (!pv.accountId || pv.accountId !== previewOwner) throw new Error('This preview was made for another user.');
+    if (pv.mapAt !== rec.analyzedAt) throw new Error('The coverage map changed since the preview. Preview again.');
+    await kvs.delete(`gappreview:${String(previewId).trim()}`);
+    wanted = new Set(pv.ids.map((x) => x.toUpperCase()));
+  }
   const gaps = rec.requirements.filter((q) => q.status === 'gap' && (!wanted || wanted.has(q.id.toUpperCase())));
   if (!gaps.length) return { created: [], skipped: [], message: 'There are no uncovered requirements to create work items for.' };
   if (!rec.items.length) throw new Error('No work item is linked to this spec yet, so the project for new work items is unknown.');
   if (!confirm) {
     const pending = [];
     for (const q of gaps.slice(0, 10)) {
-      const existing = (await kvs.get(gapId(pageId, q))) || (await kvs.get(`gapitem:${pageId}:${q.id}`));
+      const existing = await kvs.get(gapId(pageId, q));
       pending.push({ id: q.id, requirement: q.requirement, alreadyCreated: existing || null });
     }
+    const wouldCreate = pending.filter((p) => !p.alreadyCreated);
+    const previewId = `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    // The preview binds the exact requirements and map version, so the confirmed call creates what was shown.
+    await kvs.set(`gappreview:${previewId}`, { pageId: String(pageId), ids: wouldCreate.map((p) => p.id), mapAt: rec.analyzedAt, accountId: previewOwner, createdAt: now() });
     return {
       preview: true,
-      wouldCreate: pending.filter((p) => !p.alreadyCreated),
+      previewId,
+      wouldCreate,
       alreadyCreated: pending.filter((p) => p.alreadyCreated),
-      message: 'Nothing was created. Show this list to the user and call again with confirm: true only after they agree.',
+      message: 'Nothing was created. Show this list to the user. Only after they agree, call again with this previewId.',
     };
   }
   const template = await getIssue(rec.items[0].key, as);
@@ -611,12 +682,12 @@ export async function createGapItems(pageId, reqIds, as = 'user', { confirm = tr
   const created = [];
   const skipped = [];
   for (const q of gaps.slice(0, 10)) {
-    const existing = (await kvs.get(gapId(pageId, q))) || (await kvs.get(`gapitem:${pageId}:${q.id}`));
+    const existing = await kvs.get(gapId(pageId, q));
     if (existing) {
       skipped.push({ id: q.id, key: existing });
       continue;
     }
-    if (!(await tryLock(`lock:gap:${pageId}:${q.id}`, 60 * 1000))) {
+    if (!(await tryLock(`lock:${gapId(pageId, q)}`, 60 * 1000))) {
       skipped.push({ id: q.id, key: null });
       continue;
     }
@@ -732,6 +803,13 @@ export async function runOrDefer(kind, key, accountId, extra = {}, waitMs = 1800
 /** Runs queued work as the user who started it (offline impersonation), or as the app. */
 export async function processJob(body) {
   const actor = actorOf(body.accountId);
+  // Jobs started by a person or an agent always carry their account id; never run them as the app.
+  if ((body.type === 'analyze' || body.type === 'coverage' || body.type === 'userJob') && !body.accountId) {
+    console.error(`refusing ${body.type} job without a user`);
+    if (body.type === 'analyze') await kvs.set(`job:${body.issueKey}`, { state: 'error', error: 'No user for this job.', finishedAt: now() });
+    if (body.type === 'coverage') await kvs.set(`covjob:${body.pageId}`, { state: 'error', error: 'No user for this job.', finishedAt: now() });
+    return;
+  }
   if (body.type === 'analyze') {
     try {
       await runAnalysis(body.issueKey, actor);

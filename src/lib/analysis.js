@@ -33,7 +33,11 @@ export function normalizeForMatch(text) {
  */
 export function verifyQuote(quote, source) {
   const q = normalizeForMatch(quote).replace(/^["']|["']$/g, '');
-  if (!q) return true; // nothing to verify (e.g. "not mentioned")
+  // Nothing to verify (empty, only quote marks or "..."): null, which callers do not count.
+  if (!/[\p{L}\p{N}]/u.test(q)) return null;
+  // One word or a number proves nothing about where the text came from.
+  const words = q.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  if (words.length < 2 || words.join('').length < 6) return false;
   const src = normalizeForMatch(source);
   const parts = q.split(/\s*(?:\.\.\.|…)\s*/).filter((p) => p.length > 0);
   // A quote shortened with "..." only counts if every fragment is substantial and the fragments are
@@ -65,14 +69,23 @@ export function normalizeAnalysis(a, specText = '', issueText = '') {
       requirement: String(r.requirement || ''),
       specQuote,
       issueQuote,
-      specQuoteVerified: specText && specQuote.trim() ? verifyQuote(specQuote, specText) : null,
-      issueQuoteVerified: issueText && issueQuote.trim() ? verifyQuote(issueQuote, issueText) : null,
+      specQuoteVerified: specText ? verifyQuote(specQuote, specText) : null,
+      issueQuoteVerified: issueText ? verifyQuote(issueQuote, issueText) : null,
       status: STATUS.includes(r.status) ? r.status : 'unclear',
       explanation: String(r.explanation || ''),
+      unverifiedConflict: false,
       page: r.page ? String(r.page) : '',
       coveredBy: r.coveredBy ? String(r.coveredBy).toUpperCase() : '',
     };
   });
+  // A conflict whose spec quote cannot be found in the spec is not trusted: it is shown as "unclear"
+  // (with a note) and does not count as a conflict in the score or the JQL property.
+  for (const r of requirements) {
+    if (r.status === 'conflict' && r.specQuoteVerified === false) {
+      r.status = 'unclear';
+      r.unverifiedConflict = true;
+    }
+  }
   // "elsewhere" (delivered by another work item) does not count for or against this work item.
   const scored = requirements.filter((r) => r.status !== 'elsewhere');
   const score = scored.length ? Math.round((100 * scored.reduce((s, r) => s + WEIGHT[r.status], 0)) / scored.length) : null;
@@ -102,7 +115,7 @@ export function normalizeCoverage(r, itemKeys, specText = '') {
       id: String(q.id || `R${i + 1}`),
       requirement: String(q.requirement || ''),
       specQuote: String(q.specQuote || ''),
-      specQuoteVerified: specText && String(q.specQuote || '').trim() ? verifyQuote(q.specQuote, specText) : null,
+      specQuoteVerified: specText ? verifyQuote(q.specQuote, specText) : null,
       status,
       coveredBy,
       conflictsIn: clean(q.conflictsIn),

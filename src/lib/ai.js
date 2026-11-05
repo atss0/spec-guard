@@ -148,19 +148,25 @@ export async function summarizeSpecDiff(pageTitle, oldText, newText, issue) {
 Reply with JSON only:
 {"affectsIssue":true|false,"changes":[{"before":"<verbatim old excerpt or empty>","after":"<verbatim new excerpt or empty>","impact":"<one sentence for this work item>"}],"summary":"<one sentence>"}`;
   const user = [
-    `<spec_page title="${safe(pageTitle)}" version="old">\n${safe(clip(oldText, 30000))}\n</spec_page>`,
-    `<spec_page title="${safe(pageTitle)}" version="new">\n${safe(clip(newText, 30000))}\n</spec_page>`,
+    `<spec_page title="${attr(pageTitle)}" version="old">\n${safe(clip(oldText, 30000))}\n</spec_page>`,
+    `<spec_page title="${attr(pageTitle)}" version="new">\n${safe(clip(newText, 30000))}\n</spec_page>`,
     issueBlock(issue, 10000),
   ].join('\n\n');
   const r = await askJson(system, user, 2500);
   return {
     affectsIssue: r.affectsIssue !== false,
     summary: String(r.summary || ''),
-    changes: (Array.isArray(r.changes) ? r.changes : []).slice(0, 10).map((c) => ({
-      before: String(c.before || ''),
-      after: String(c.after || ''),
-      impact: String(c.impact || ''),
-    })),
+    changes: (Array.isArray(r.changes) ? r.changes : []).slice(0, 10).map((c) => {
+      const before = String(c.before || '');
+      const after = String(c.after || '');
+      return {
+        before,
+        after,
+        beforeVerified: verifyQuote(before, oldText),
+        afterVerified: verifyQuote(after, newText),
+        impact: String(c.impact || ''),
+      };
+    }),
   };
 }
 

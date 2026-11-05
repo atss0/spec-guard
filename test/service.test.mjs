@@ -9,6 +9,7 @@ const store = new Map();
 const queued = [];
 const requests = [];
 let readablePages = new Set(['100']);
+let canEdit = true;
 let issueDescription = 'Reset password.\nSpec: https://x.atlassian.net/wiki/spaces/S/pages/100/Spec\nAcceptance criteria\n- link expires after 48 hours';
 
 const adf = (text) => ({ type: 'doc', version: 1, content: text.split('\n').map((t) => ({ type: 'paragraph', content: [{ type: 'text', text: t }] })) });
@@ -20,6 +21,7 @@ function fakeClient(who) {
       requests.push({ who, path: String(path), method: opts.method || 'GET' });
       const p = String(path);
       if (p.includes('/remotelink')) return res(200, []);
+      if (p.includes('/mypermissions')) return res(200, { permissions: { EDIT_ISSUES: { havePermission: canEdit } } });
       if (p.includes('/comment')) return res(201, { id: '1' });
       if (opts.method === 'PUT') return res(204);
       if (p.startsWith('/rest/api/3/issue/PLAT-1')) {
@@ -68,6 +70,7 @@ beforeEach(() => {
   queued.length = 0;
   requests.length = 0;
   readablePages = new Set(['100']);
+  canEdit = true;
 });
 
 test('a proposal can be applied once, by the user who requested it', async () => {
@@ -104,7 +107,7 @@ test('agent actions fail closed when the calling user is unknown', async () => {
 });
 
 test('jobs cannot be stored or read without a user', async () => {
-  await assert.rejects(service.startUserJob('verify', 'PLAT-1', undefined), /calling user/);
+  await assert.rejects(service.startUserJob('verify', 'PLAT-1', undefined), /identify the (calling|current) user/);
   await assert.rejects(service.getUserJob('verify', 'PLAT-1', undefined), /calling user/);
 });
 
@@ -154,4 +157,33 @@ test('a coverage map is not stale just because a linked item was already conside
   assert.equal((await service.getCoverage('100')).stale, false);
   store.set('link:100:PLAT-7', 1);
   assert.equal((await service.getCoverage('100')).stale, true, 'a newly linked item makes it stale');
+});
+
+test('panel checks and coverage maps need a known user', async () => {
+  await assert.rejects(service.requestAnalysis('PLAT-1', undefined), /current user/);
+  await assert.rejects(service.requestCoverage('100', undefined), /current user/);
+  await service.processJob({ type: 'analyze', issueKey: 'PLAT-1' });
+  assert.equal(store.get('job:PLAT-1').state, 'error', 'a job without a user is refused, not run as the app');
+});
+
+test('a re-check cannot replace a report built from a page the user cannot read', async () => {
+  issueDescription += '\nAlso https://x.atlassian.net/wiki/spaces/S/pages/200/Restricted';
+  store.set('analysis:PLAT-1', { result: { score: 50, requirements: [] }, pages: [{ id: '100' }, { id: '200' }], pendingChanges: [] });
+  try {
+    await assert.rejects(service.requestAnalysis('PLAT-1', 'alice'), /cannot read/);
+  } finally {
+    issueDescription = issueDescription.replace(/\nAlso .*$/, '');
+  }
+});
+
+test('only people who can edit the work item can switch a spec page off', async () => {
+  canEdit = false;
+  await assert.rejects(service.setPageIgnored('PLAT-1', '100', true), /can edit/);
+});
+
+test('agents create exactly the previewed gaps, once, for the same user', async () => {
+  store.set('coverage:100', { pageVersion: 3, analyzedAt: 't1', items: [{ key: 'PLAT-1' }], requirements: [{ id: 'R1', status: 'gap', requirement: 'Audit log', specQuote: 'Every reset is logged.', coveredBy: [], conflictsIn: [] }] });
+  const pv = await service.createGapItems('100', null, 'user', { confirm: false, previewOwner: 'alice' });
+  assert.ok(pv.previewId);
+  await assert.rejects(service.createGapItems('100', null, 'user', { confirm: true, previewId: pv.previewId, previewOwner: 'mallory' }), /another user/);
 });

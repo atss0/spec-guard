@@ -83,6 +83,11 @@ const RequirementCard = ({ r }) => (
         <Text>Work item: {r.issueQuote ? <Quote text={r.issueQuote} verified={r.issueQuoteVerified} /> : <Em>not mentioned</Em>}</Text>
       )}
       {r.explanation ? <Text>{r.explanation}</Text> : null}
+      {r.unverifiedConflict ? (
+        <Text>
+          <Em>Reported as a conflict, but the spec quote was not found in the spec, so it is not counted as one. Check it by hand.</Em>
+        </Text>
+      ) : null}
     </Stack>
   </Box>
 );
@@ -97,7 +102,8 @@ const PendingChange = ({ c }) => (
     {c.diff
       ? c.diff.changes.slice(0, 3).map((d, i) => (
           <Text key={i}>
-            <Em>“{d.before || '(new)'}”</Em> → <Em>“{d.after || '(removed)'}”</Em>
+            {d.before ? <Quote text={d.before} verified={d.beforeVerified} /> : <Em>(new)</Em>} →{' '}
+            {d.after ? <Quote text={d.after} verified={d.afterVerified} /> : <Em>(removed)</Em>}
           </Text>
         ))
       : null}
