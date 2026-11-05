@@ -140,6 +140,13 @@ export function findAcceptanceCriteriaStart(content) {
   return content.findIndex((n) => (n.type === 'heading' || n.type === 'paragraph') && AC_TITLE.test(nodeText(n)));
 }
 
+/** True if an acceptance-criteria label appears anywhere below the top level of the document. */
+export function hasNestedAcceptanceCriteria(content) {
+  const walk = (nodes, depth) =>
+    (nodes || []).some((n) => (depth > 0 && (n.type === 'heading' || n.type === 'paragraph') && AC_TITLE.test(nodeText(n))) || walk(n.content, depth + 1));
+  return walk(content, 0);
+}
+
 /**
  * Replaces the acceptance-criteria section (from its label up to the next heading or label-like
  * paragraph) with new bullet points. Appends a section if none exists. Everything else in the
@@ -149,7 +156,14 @@ export function replaceAcceptanceCriteria(adf, items, note) {
   const content = adf && Array.isArray(adf.content) ? [...adf.content] : [];
   const start = findAcceptanceCriteriaStart(content);
   const section = [bulletList(items), para(note)];
-  if (start === -1) return { type: 'doc', version: 1, content: [...content, heading('Acceptance criteria'), ...section] };
+  if (start === -1) {
+    // A label inside a panel, expand or table cannot be replaced safely; appending would leave two
+    // conflicting sections, so refuse instead.
+    if (hasNestedAcceptanceCriteria(content)) {
+      throw new Error('The acceptance criteria are inside a panel, expand or table. Move them to the top level of the description, or apply the proposed changes by hand.');
+    }
+    return { type: 'doc', version: 1, content: [...content, heading('Acceptance criteria'), ...section] };
+  }
   let end = start + 1;
   const isNextSection = (n) => n.type === 'heading' || (n.type === 'paragraph' && /^\s*\S[^.]{0,40}:\s*$/.test(nodeText(n)));
   while (end < content.length && !isNextSection(content[end])) end++;

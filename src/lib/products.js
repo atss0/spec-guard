@@ -9,7 +9,7 @@
  *                 allow it in manifest.yml)
  */
 import api, { route } from '@forge/api';
-import { adfToText, storageToText, findConfluencePageIds } from './text';
+import { adfToText, storageToText, findConfluencePageIds } from './text.js';
 
 const client = (as) => {
   if (as && typeof as === 'object' && as.accountId) return api.asUser(as.accountId);

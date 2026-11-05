@@ -1,8 +1,6 @@
 // Spec Guard evaluation: runs check-alignment and get-spec-coverage several times on a seeded spec
 // with known ground truth and reports detection, false positives, stability and quote verification.
-// Usage: node scripts/eval.mjs [runs]
-// Needs an OAuth token store for the MCP endpoint (SPECGUARD_OAUTH_STORE, see the MCP test client).
-// PAGE and TRUTH refer to the evaluation spec and work items on the builder's demo site.
+// Usage: node eval.mjs [runs]
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import fs from 'node:fs';
@@ -17,8 +15,8 @@ const TRUTH = {
   'PLAT-33521': { scope: ['NT-7'], conflicts: [] },
 };
 
-const load = () => JSON.parse(fs.readFileSync(process.env.SPECGUARD_OAUTH_STORE || './oauth-store.json', 'utf8'));
-const save = (p) => fs.writeFileSync(process.env.SPECGUARD_OAUTH_STORE || './oauth-store.json', JSON.stringify({ ...load(), ...p }, null, 2));
+const load = () => JSON.parse(fs.readFileSync('./oauth-store.json', 'utf8'));
+const save = (p) => fs.writeFileSync('./oauth-store.json', JSON.stringify({ ...load(), ...p }, null, 2));
 const provider = {
   get redirectUrl() { return 'http://localhost:8765/callback'; },
   get clientMetadata() { return { client_name: 'eval', redirect_uris: ['http://localhost:8765/callback'] }; },
@@ -73,18 +71,17 @@ for (const [key, truth] of Object.entries(TRUTH)) {
   }
 }
 
-// Coverage map (built once; it is cached until the spec or its linked work items change)
+// Coverage map: built once (it is cached until the spec or its linked work items change)
 const covRuns = [];
-for (let run = 1; run <= 1; run++) {
+{
   let c = await call('coverage', { spec: PAGE });
-  // wait while the map is being (re)built
   for (let i = 0; c.building && i < 20; i++) {
     await sleep(10000);
     c = await call('coverage', { spec: PAGE });
   }
   const conflictIds = c.requirements.filter((q) => q.status === 'conflict').map((q) => reqId(q));
-  covRuns.push({ run, totals: c.totals, conflictIds, gaps: c.requirements.filter((q) => q.status === 'gap').map((q) => reqId(q)) });
-  console.log(`coverage run ${run}:`, JSON.stringify(c.totals), 'conflicts', conflictIds.join(','));
+  covRuns.push({ totals: c.totals, conflictIds, gaps: c.requirements.filter((q) => q.status === 'gap').map((q) => reqId(q)) });
+  console.log('coverage:', JSON.stringify(c.totals), 'conflicts', conflictIds.join(','));
 }
 await client.close();
 

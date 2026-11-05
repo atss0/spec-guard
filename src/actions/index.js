@@ -16,7 +16,7 @@ import {
   runOrDefer,
   getUserJob,
   applyProposalById,
-} from '../lib/service';
+} from '../lib/service.js';
 
 /** Work item key from the input or from the Jira context the agent was opened in. */
 function issueKeyFrom(payload) {
@@ -29,7 +29,10 @@ function issueKeyFrom(payload) {
 
 /** The calling user (Rovo and MCP put it in different places). */
 function accountIdFrom(payload, context) {
-  return (context && (context.accountId || (context.principal && context.principal.accountId))) || (payload && payload.context && payload.context.accountId);
+  const id = (context && (context.accountId || (context.principal && context.principal.accountId))) || (payload && payload.context && payload.context.accountId);
+  // Fail closed: without a known user the action would run with the app's permissions.
+  if (!id) throw new Error('Spec Guard could not identify the calling user, so it did not run this action.');
+  return id;
 }
 
 /** Turns errors into a message the agent can show instead of failing the tool call. */
@@ -65,12 +68,14 @@ export const alignWorkItemAction = wrap(async (payload, context) => runOrDefer('
 /** Step 2 of 2: applies a proposal the user approved. */
 export const applyAlignmentAction = wrap(async (payload, context) => applyProposalById(payload.proposalId, accountIdFrom(payload, context)));
 
-export const createGapItemsAction = wrap(async (payload) => {
+export const createGapItemsAction = wrap(async (payload, context) => {
   const pageId = await resolveSpecPageId(payload.spec);
   const ids = String(payload.requirementIds || '')
     .split(/[,\s]+/)
     .filter(Boolean);
-  return createGapItems(pageId, ids.length ? ids : null, 'user');
+  accountIdFrom(payload, context);
+  const confirm = payload.confirm === true || String(payload.confirm).toLowerCase() === 'true';
+  return createGapItems(pageId, ids.length ? ids : null, 'user', { confirm });
 });
 
 /** Collects the result of a job that was still running when an action returned. */

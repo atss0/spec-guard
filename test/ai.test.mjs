@@ -91,3 +91,25 @@ test('normalizeCoverage drops unknown work items and treats unattributed coverag
   assert.equal(c.requirements[3].status, 'gap');
   assert.deepEqual(c.totals, { total: 4, covered: 1, partial: 0, conflict: 1, gap: 2 });
 });
+
+test('empty quotes are not counted as verified', () => {
+  const a = normalizeAnalysis(
+    { requirements: [{ id: 'R1', status: 'missing', specQuote: 'The reset link is single-use', issueQuote: '' }, { id: 'R2', status: 'unclear', specQuote: '  ', issueQuote: '' }] },
+    SPEC,
+    'some work item text',
+  );
+  assert.equal(a.requirements[1].specQuoteVerified, null);
+  assert.equal(a.requirements[0].issueQuoteVerified, null);
+  assert.deepEqual(a.quoteCheck, { checked: 1, verified: 1 });
+});
+
+test('verifyQuote rejects ellipsis quotes made of tiny fragments', () => {
+  assert.equal(verifyQuote('The ... 24', SPEC), false);
+  assert.equal(verifyQuote('a ... b ... c', SPEC), false);
+});
+
+test('verifyQuote rejects phrases stitched together from far apart', () => {
+  const long = 'The reset link is single-use. ' + 'Filler text that is unrelated. '.repeat(20) + 'Sessions expire after 48 hours of inactivity.';
+  assert.equal(verifyQuote('The reset link is single-use ... expire after 48 hours', long), false);
+  assert.equal(verifyQuote('The reset link ... expires ... 48 hours', SPEC), false);
+});

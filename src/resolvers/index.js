@@ -18,8 +18,8 @@ import {
   setPageIgnored,
   pollWatchedPages,
   loadContext,
-} from '../lib/service';
-import { demoTargets, createDemo } from '../lib/demo';
+} from '../lib/service.js';
+import { demoTargets, createDemo } from '../lib/demo.js';
 
 const resolver = new Resolver();
 
@@ -81,7 +81,7 @@ resolver.define(
 
 // Global page
 resolver.define('listAlignment', safe(() => listAlignment()));
-resolver.define('checkSpecsNow', safe(() => pollWatchedPages()));
+resolver.define('checkSpecsNow', safe(() => pollWatchedPages({ budgetMs: 20000 })));
 resolver.define('demoTargets', safe(() => demoTargets()));
 resolver.define(
   'createDemo',

@@ -6,7 +6,7 @@
   "private": true,
   "scripts": {
     "lint": "eslint src/**/*",
-    "test": "node --test test/text.test.mjs test/ai.test.mjs"
+    "test": "node --experimental-test-module-mocks --test test/text.test.mjs test/ai.test.mjs test/service.test.mjs"
   },
   "devDependencies": {
     "eslint": "^8.56.0",

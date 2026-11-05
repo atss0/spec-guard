@@ -184,7 +184,7 @@ modules:
       name: Create work items for spec gaps
       function: createGapItemsFn
       actionVerb: CREATE
-      description: "Creates Jira work items for requirements of a Confluence spec that no work item covers (gaps in the coverage map), each linked to the spec. Never creates a second work item for the same gap."
+      description: "Creates Jira work items for requirements of a Confluence spec that no work item covers (gaps in the coverage map), each linked to the spec. Without confirm it only lists what would be created; call again with confirm true after the user agrees."
       inputs:
         spec:
           title: Spec page or work item
@@ -196,6 +196,11 @@ modules:
           type: string
           required: false
           description: "Optional comma-separated requirement IDs (e.g. FR-5, SR-1). Empty means all gaps."
+        confirm:
+          title: Confirm
+          type: boolean
+          required: false
+          description: "Set to true only after the user has seen the list and agreed. Without it nothing is created."
     - key: get-job-result
       name: Get job result
       function: getJobResultFn
@@ -272,6 +277,7 @@ modules:
       handler: index.getJobResultAction
     - key: pollSpecsFn
       handler: index.pollSpecs
+      timeoutSeconds: 600
     - key: pageUpdatedFn
       handler: index.pageUpdated
     - key: issueChangedFn

@@ -15,7 +15,7 @@ Spec Guard treats the spec as the source of truth and checks everything downstre
 ## Features
 
 **On a Jira work item**
-- **Alignment report.** Spec Guard reads the linked spec, decides which requirements this work item is responsible for, and marks each one as covered, missing, conflicting, unclear, or delivered by another work item. Every finding quotes the spec and the work item, and every quote is checked against its source; quotes that are not found word for word are flagged.
+- **Alignment report.** Spec Guard reads the linked spec, decides which requirements this work item is responsible for, and marks each one as covered, missing, conflicting, unclear, or delivered by another work item. Every finding quotes the spec and the work item, and every quote is checked against its source. Quotes not found word for word are flagged; a quote shortened with "..." only counts if each piece is at least 10 characters long and the pieces are close together in the source.
 - **Align work item with spec.** Proposes acceptance criteria with the spec's values. You review the changes, then apply them. Only the acceptance criteria section of the description is replaced, and a comment records what changed.
 - **Verify a change.** Paste a summary or diff of what was implemented. The verdict (pass, needs attention, fails spec) judges the change only; problems in the work item itself are listed separately.
 - **Sidebar status** on every work item, and automatic re-check when the description is edited.
@@ -23,7 +23,7 @@ Spec Guard treats the spec as the source of truth and checks everything downstre
 
 **On a Confluence spec page**
 - The work items that implement the spec and which of them drift.
-- **Requirement coverage map:** each requirement, the work items that deliver it, conflicts between them, and gaps that no work item covers. One click creates work items for the gaps (linked to the spec, quoting the requirement, never twice for the same gap).
+- **Requirement coverage map:** each requirement, the work items that deliver it, conflicts between them, and gaps that no work item covers. One click creates work items for the gaps (linked to the spec and quoting the requirement; a gap that already has a work item is skipped, matched by the requirement's text).
 
 **When the spec changes**
 - Each affected work item gets a comment saying the spec changed and how many changes affect it, and its report is marked out of date. The before/after details are shown in Spec Guard only to people who can read the spec.
@@ -58,10 +58,22 @@ Spec Guard treats the spec as the source of truth and checks everything downstre
 - Work items linked to a spec are found from the link index and by scanning recently updated work items in the same projects.
 
 ### Permissions and safety
-- Product data is always read as the current user. Analyses, coverage maps and before/after diffs contain spec text and are only returned to users who can read every spec page they are based on.
+Who each request runs as:
+
+| What | Runs as |
+|---|---|
+| Panels, byline, global page, Rovo and MCP actions | The current user |
+| Background jobs started by a user (check, verify, coverage, align) | That user (offline impersonation) |
+| Re-check after a description edit | The editor, and only if they can read every spec page of the saved report; otherwise the report is just marked out of date |
+| Reacting to a spec change (event or hourly check) | Reads the page as the editor or as the user who last analysed it; reads the linked work items and posts the notice comment as the app |
+| JQL issue property | Written by the app |
+
+- Analyses, coverage maps and before/after diffs contain spec text. They are only returned to users who can read every spec page they are based on; spec changes from a page the viewer cannot read are left out, and coverage notes that mention work items the viewer cannot see are dropped.
 - Comments written to Jira never contain spec text.
 - Spec and work item text is passed to the model inside data tags, and the model is told not to follow instructions in it.
-- Nothing is written to Jira without a user action: aligning a work item is a two-step propose/apply, and creating gap work items needs confirmation.
+- Agent actions refuse to run when the calling user cannot be identified, so they never fall back to the app's permissions.
+- Changes to work item content need a user action: aligning a work item is propose, then apply (single use, same user, 24 hours, refused if the work item changed in between). Creating gap work items from an agent is two calls, the second with `confirm: true`. Automatic writes are limited to the spec-change comment, the JQL property and refreshed reports.
+- Each user can start up to 60 LLM jobs per hour, and a check that is already running is not started twice.
 
 ## Evaluation
 

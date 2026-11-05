@@ -26,9 +26,10 @@ import {
   createIssue,
   findItemsLinkingPage,
   setAlignmentProperty,
-} from './products';
-import { replaceAcceptanceCriteria, gapIssueAdf, clipBytes } from './text';
-import { analyzeAlignment, verifyChange, summarizeSpecDiff, buildCoverageMap, proposeWorkItemFix } from './ai';
+} from './products.js';
+import { replaceAcceptanceCriteria, gapIssueAdf, clipBytes } from './text.js';
+import { analyzeAlignment, verifyChange, summarizeSpecDiff, buildCoverageMap, proposeWorkItemFix } from './ai.js';
+import { normalizeForMatch } from './analysis.js';
 
 const queue = new Queue({ key: 'specguard-jobs' });
 
@@ -75,6 +76,17 @@ async function tryLock(key, ms) {
 }
 
 const runningJob = () => ({ state: 'running', startedAt: now() });
+const isRunning = (job) => { const j = normalizeJob(job); return Boolean(j && j.state === 'running'); };
+
+const HOURLY_LLM_JOBS_PER_USER = 60;
+/** Simple per-user hourly budget for LLM work started by people or agents. */
+async function takeQuota(accountId) {
+  if (!accountId) return;
+  const key = `quota:${accountId}:${now().slice(0, 13)}`;
+  const used = (await kvs.get(key)) || 0;
+  if (used >= HOURLY_LLM_JOBS_PER_USER) throw new Error('Spec Guard hourly limit reached for this user. Try again later.');
+  await kvs.set(key, used + 1);
+}
 
 /** Reports jobs that ran longer than the timeout (e.g. a crashed worker) as failed. */
 function normalizeJob(job) {
@@ -102,6 +114,13 @@ async function registerLinks(issueKey, pageIds) {
 }
 
 /** Work items known to link a spec page (per-link keys plus the older list format). */
+/** Removes a spec link that no longer exists in the work item. */
+async function unregisterLink(pageId, issueKey) {
+  await kvs.delete(`link:${pageId}:${issueKey}`);
+  const legacy = (await kvs.get(`watch:${pageId}`)) || [];
+  if (legacy.includes(issueKey)) await kvs.set(`watch:${pageId}`, legacy.filter((k) => k !== issueKey));
+}
+
 async function watchersOf(pageId) {
   const keys = new Set((await kvs.get(`watch:${pageId}`)) || []);
   for (const r of await listByPrefix(`link:${pageId}:`, 500)) keys.add(r.key.slice(`link:${pageId}:`.length));
@@ -112,7 +131,7 @@ async function watchersOf(pageId) {
  * Work items linked to a spec page. Combines the link index with a scan of recently updated work
  * items in the same projects, so items nobody has opened in Spec Guard yet are found too.
  */
-async function linkedItems(pageId, as, { exclude = null, max = 25 } = {}) {
+async function linkedItems(pageId, as, { exclude = null, max = 25, considered = null } = {}) {
   const known = await watchersOf(pageId);
   const projects = [...new Set(known.map((k) => k.split('-')[0]))];
   let scanned = [];
@@ -123,9 +142,13 @@ async function linkedItems(pageId, as, { exclude = null, max = 25 } = {}) {
   }
   const keys = [...new Set([...known, ...scanned])].filter((k) => k !== exclude);
   const items = [];
-  for (const key of keys.slice(0, max)) {
+  // Index entries can be stale (link removed, item deleted), so keep looking until max real items.
+  for (const key of keys.slice(0, max * 3)) {
+    if (items.length >= max) break;
+    if (considered) considered.push(key);
     try {
       const it = await getIssue(key, as);
+      if (!it.linkedPageIds.includes(String(pageId)) && known.includes(key)) await unregisterLink(pageId, key);
       if (it.linkedPageIds.includes(String(pageId))) {
         items.push({ key: it.key, summary: it.summary, description: it.description, projectKey: it.projectKey, issueTypeId: it.issueTypeId });
         if (!known.includes(key)) await registerLinks(key, [String(pageId)]);
@@ -155,7 +178,10 @@ const pageRef = (p) => ({ id: p.id, title: p.title, version: p.version, url: p.u
 
 /** Short fingerprint of summary + description, to notice edits. */
 function hashIssue(issue) {
-  const str = `${issue.summary}\n${issue.description}`;
+  return hashText(`${issue.summary}\n${issue.description}`);
+}
+
+function hashText(str) {
   let h = 5381;
   for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
   return String(h);
@@ -184,6 +210,8 @@ export async function loadContext(issueKey, as = 'user') {
 /** Marks a linked Confluence page as "not a spec" (or a spec again) for one work item. */
 export async function setPageIgnored(issueKey, pageId, ignored) {
   await getIssue(issueKey, 'user'); // permission check
+  // Switching a page off affects everyone's report, so only someone who can read the page may do it.
+  if (!(await canReadPage(pageId, 'user'))) throw new Error('You cannot read this page.');
   const list = new Set((await kvs.get(`ignore:${issueKey}`)) || []);
   if (ignored) list.add(String(pageId));
   else list.delete(String(pageId));
@@ -233,7 +261,8 @@ export async function getStatus(issueKey, as = 'user') {
     analyzedAt: saved ? saved.analyzedAt : null,
     stale: Boolean(saved) && reasons.length > 0,
     staleReasons: reasons,
-    pendingChanges: saved && saved.pendingChanges ? saved.pendingChanges : [],
+    // A change can come from a page linked after the analysis; show it only if this user can read that page.
+    pendingChanges: saved && saved.pendingChanges ? saved.pendingChanges.filter((c) => pages.some((p) => p.id === String(c.pageId))) : [],
     job: normalizeJob(await kvs.get(`job:${issueKey}`)),
   };
 }
@@ -269,6 +298,8 @@ async function syncProperty(issueKey, result, specChanged) {
 export async function requestAnalysis(issueKey, accountId) {
   const { pages } = await loadContext(issueKey, 'user');
   if (pages.length === 0) return { queued: false, noSpec: true };
+  if (isRunning(await kvs.get(`job:${issueKey}`))) return { queued: false, alreadyRunning: true };
+  await takeQuota(accountId);
   await kvs.set(`job:${issueKey}`, runningJob());
   await queue.push({ body: { type: 'analyze', issueKey, accountId } });
   return { queued: true };
@@ -317,6 +348,8 @@ async function saveSnapshot(pageId, page, accountId) {
 }
 
 export async function enqueuePageUpdated(pageId, accountId) {
+  // Most edited pages on a site are not specs; only pages linked from a work item are queued.
+  if ((await watchersOf(pageId)).length === 0) return false;
   await queue.push({ body: { type: 'pageUpdated', pageId: String(pageId), accountId } });
 }
 
@@ -341,12 +374,20 @@ export async function onPageUpdated(pageId, actor = 'app') {
   if (!snapshot) return { notified: 0, skipped: 'no previous snapshot' };
 
   let notified = 0;
-  for (const issueKey of watchers.slice(0, 10)) {
+  let failed = 0;
+  const MAX_NOTIFY = 25; // each one is an LLM call; the queue consumer has 10 minutes
+  if (watchers.length > MAX_NOTIFY) console.warn(`spec ${pageId}: ${watchers.length} linked work items, notifying the first ${MAX_NOTIFY}`);
+  for (const issueKey of watchers.slice(0, MAX_NOTIFY)) {
+    const marker = `notified:${pageId}:${page.version}:${issueKey}`;
+    if (await kvs.get(marker)) continue; // already handled in an earlier attempt
     try {
       const issue = await getIssue(issueKey, 'app');
       if (!issue.linkedPageIds.includes(String(pageId))) continue;
       const diff = await summarizeSpecDiff(page.title, snapshot.text, page.text, issue);
-      if (!diff.affectsIssue) continue;
+      if (!diff.affectsIssue) {
+        await kvs.set(marker, now());
+        continue;
+      }
       const n = diff.changes.length;
       await addComment(
         issueKey,
@@ -362,25 +403,35 @@ export async function onPageUpdated(pageId, actor = 'app') {
         await safeSet(`analysis:${issueKey}`, saved);
         await syncProperty(issueKey, saved.result, true);
       }
+      await kvs.set(marker, now());
       notified++;
     } catch (e) {
+      failed++;
       console.error(`notify ${issueKey} failed`, e.message);
     }
   }
-  return { notified };
+  // If any work item could not be handled, put the old snapshot back so the hourly check retries.
+  // Work items that were already handled are skipped through their markers.
+  if (failed) {
+    await safeSet(`snapshot:${pageId}`, snapshot);
+    await kvs.set(`snapver:${pageId}`, { version: snapshot.version, accountId: snapshot.accountId });
+  }
+  return { notified, failed };
 }
 
 /**
  * Checks every spec Spec Guard has seen for a newer version (fallback for missed events; also behind
  * the "Check specs for changes" button). Each page is read as the user who last analysed it.
  */
-export async function pollWatchedPages() {
+export async function pollWatchedPages({ budgetMs = 8 * 60 * 1000 } = {}) {
+  const started = Date.now();
   let queued = 0;
   const seen = new Set();
-  for (const prefix of ['snapver:', 'snapshot:']) {
+  for (const prefix of ['snapver:']) {
     for (const { key, value } of await listByPrefix(prefix, 300)) {
       const pageId = key.slice(prefix.length);
       if (seen.has(pageId)) continue;
+      if (Date.now() - started > budgetMs) return { queued, incomplete: true };
       seen.add(pageId);
       const current = await pageVersion(pageId, actorOf(value.accountId));
       if (current !== null && current !== value.version) {
@@ -402,7 +453,13 @@ export async function onIssueChanged(issueKey, accountId) {
   if (!issue.linkedPageIds.length) return { indexed: 0 };
   await registerLinks(issueKey, issue.linkedPageIds);
   const saved = await kvs.get(`analysis:${issueKey}`);
-  if (saved && saved.issueHash !== hashIssue(issue) && accountId && (await tryLock(`lock:issue:${issueKey}`, 2 * 60 * 1000))) {
+  const editorReadsAll = async () => {
+    for (const p of (saved && saved.pages) || []) if (!(await canReadPage(p.id, as))) return false;
+    return true;
+  };
+  // An editor who cannot read every spec page would replace the shared analysis with a weaker one;
+  // in that case the report is only shown as out of date.
+  if (saved && saved.issueHash !== hashIssue(issue) && accountId && (await editorReadsAll()) && (await tryLock(`lock:issue:${issueKey}`, 2 * 60 * 1000))) {
     await kvs.set(`job:${issueKey}`, runningJob());
     await queue.push({ body: { type: 'analyze', issueKey, accountId }, delayInSeconds: 60 });
     return { indexed: issue.linkedPageIds.length, recheck: true };
@@ -456,9 +513,10 @@ export async function pageAlignment(pageId) {
 
 export async function runCoverage(pageId, as = 'app') {
   const page = await getPage(pageId, as);
-  const items = await linkedItems(pageId, as);
+  const considered = [];
+  const items = await linkedItems(pageId, as, { considered });
   const map = await buildCoverageMap(page, items);
-  const record = { analyzedAt: now(), pageVersion: page.version, items: items.map((i) => ({ key: i.key, summary: i.summary })), ...map };
+  const record = { analyzedAt: now(), pageVersion: page.version, items: items.map((i) => ({ key: i.key, summary: i.summary })), considered, ...map };
   await safeSet(`coverage:${pageId}`, record);
   return record;
 }
@@ -483,11 +541,17 @@ export async function getCoverage(pageId) {
   const watchers = await watchersOf(pageId);
   return {
     job,
-    stale: (current !== null && current !== rec.pageVersion) || watchers.some((k) => !rec.items.some((i) => i.key === k)),
+    stale: (current !== null && current !== rec.pageVersion) || watchers.some((k) => !rec.items.some((i) => i.key === k) && !(rec.considered || []).includes(k)),
     coverage: {
       ...rec,
       items: rec.items.filter((i) => visible.has(i.key)),
-      requirements: rec.requirements.map((q) => ({ ...q, coveredBy: hide(q.coveredBy), conflictsIn: hide(q.conflictsIn) })),
+      // The note can describe work items this user cannot see; drop it when any were hidden.
+      requirements: rec.requirements.map((q) => {
+        const coveredBy = hide(q.coveredBy);
+        const conflictsIn = hide(q.conflictsIn);
+        const hidden = coveredBy.length !== q.coveredBy.length || conflictsIn.length !== q.conflictsIn.length;
+        return { ...q, coveredBy, conflictsIn, note: hidden ? '' : q.note };
+      }),
     },
   };
 }
@@ -518,7 +582,10 @@ export async function specCoverageFor(ref, accountId) {
  * Creates work items for uncovered requirements (gaps) of a spec, in the same project and type as the
  * linked work items, each linked to the spec. A gap never gets a second work item.
  */
-export async function createGapItems(pageId, reqIds, as = 'user') {
+/** Gap identity: the requirement's spec text, because model-made ids (R1, R2, ...) can shift between rebuilds. */
+const gapId = (pageId, q) => `gapitem:${pageId}:${hashText(normalizeForMatch(q.specQuote || q.requirement))}`;
+
+export async function createGapItems(pageId, reqIds, as = 'user', { confirm = true } = {}) {
   if (!(await canReadPage(pageId, as))) throw new Error('You cannot read this page.');
   const rec = await kvs.get(`coverage:${pageId}`);
   if (!rec) throw new Error('Build the coverage map first.');
@@ -526,12 +593,25 @@ export async function createGapItems(pageId, reqIds, as = 'user') {
   const gaps = rec.requirements.filter((q) => q.status === 'gap' && (!wanted || wanted.has(q.id.toUpperCase())));
   if (!gaps.length) return { created: [], skipped: [], message: 'There are no uncovered requirements to create work items for.' };
   if (!rec.items.length) throw new Error('No work item is linked to this spec yet, so the project for new work items is unknown.');
+  if (!confirm) {
+    const pending = [];
+    for (const q of gaps.slice(0, 10)) {
+      const existing = (await kvs.get(gapId(pageId, q))) || (await kvs.get(`gapitem:${pageId}:${q.id}`));
+      pending.push({ id: q.id, requirement: q.requirement, alreadyCreated: existing || null });
+    }
+    return {
+      preview: true,
+      wouldCreate: pending.filter((p) => !p.alreadyCreated),
+      alreadyCreated: pending.filter((p) => p.alreadyCreated),
+      message: 'Nothing was created. Show this list to the user and call again with confirm: true only after they agree.',
+    };
+  }
   const template = await getIssue(rec.items[0].key, as);
   const page = await getPage(pageId, as);
   const created = [];
   const skipped = [];
   for (const q of gaps.slice(0, 10)) {
-    const existing = await kvs.get(`gapitem:${pageId}:${q.id}`);
+    const existing = (await kvs.get(gapId(pageId, q))) || (await kvs.get(`gapitem:${pageId}:${q.id}`));
     if (existing) {
       skipped.push({ id: q.id, key: existing });
       continue;
@@ -550,7 +630,7 @@ export async function createGapItems(pageId, reqIds, as = 'user') {
       },
       as
     );
-    await kvs.set(`gapitem:${pageId}:${q.id}`, key);
+    await kvs.set(gapId(pageId, q), key);
     await registerLinks(key, [String(pageId)]);
     created.push({ id: q.id, key, summary });
   }
@@ -600,7 +680,7 @@ export async function saveProposal(proposal, accountId) {
 export async function applyProposalById(id, accountId) {
   const rec = await kvs.get(`proposal:${String(id || '').trim()}`);
   if (!rec) throw new Error('Unknown or expired proposal id. Call align-work-item again to get a new proposal.');
-  if (rec.accountId && accountId && rec.accountId !== accountId) throw new Error('This proposal was made for another user.');
+  if (!rec.accountId || !accountId || rec.accountId !== accountId) throw new Error('This proposal was made for another user.');
   if (Date.now() - new Date(rec.createdAt).getTime() > 24 * 3600 * 1000) throw new Error('This proposal has expired. Propose again.');
   await kvs.delete(`proposal:${id}`); // single use, even if applying fails below
   const r = await applyProposal(rec.proposal.issueKey, rec.proposal, 'user', accountId);
@@ -609,10 +689,16 @@ export async function applyProposalById(id, accountId) {
 
 // ---------- user jobs (panel and agent actions) ----------
 
-const jobKey = (kind, key, accountId) => `job:${kind}:${key}:${accountId || 'app'}`;
+const jobKey = (kind, key, accountId) => {
+  if (!accountId) throw new Error('Spec Guard could not identify the calling user.');
+  return `job:${kind}:${key}:${accountId}`;
+};
 
 /** Starts a background job for the current user. kind: verify | fix | analyze-action | coverage-action */
 export async function startUserJob(kind, key, accountId, extra = {}) {
+  // The same request while one is running just waits for that one (verify carries new input, so it restarts).
+  if (kind !== 'verify' && isRunning(await kvs.get(jobKey(kind, key, accountId)))) return;
+  await takeQuota(accountId);
   await kvs.set(jobKey(kind, key, accountId), runningJob());
   await queue.push({ body: { type: 'userJob', kind, key, accountId, ...extra } });
 }

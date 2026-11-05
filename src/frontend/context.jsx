@@ -25,7 +25,7 @@ const App = () => {
     setError(null);
     const r = await invoke('runAnalysis');
     if (!r.ok) setError(r.error);
-    else if (r.data.queued) {
+    else if (r.data.queued || r.data.alreadyRunning) {
       for (let i = 0; i < 90; i++) {
         await sleep(i < 5 ? 2000 : 4000);
         const d = await load();

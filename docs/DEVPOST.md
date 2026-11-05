@@ -32,7 +32,7 @@ Design choices aimed at trust:
 - Quotes are verified against the source text; unverified quotes are labelled.
 - Spec and work item text is passed to the model as data, with instructions inside it ignored.
 - Analyses and diffs are only shown to users who can read the spec; Jira comments never contain spec text.
-- Writes are always user-initiated and previewed.
+- Changes to work item content are always proposed first and applied only after the user approves; agents cannot apply a proposal made for someone else, and agent actions refuse to run without a known user.
 
 ## Evaluation
 On a seeded spec with 4 planted conflicts across 4 work items, analysed 3 times each: 11 of 12 conflicts found, 0 false conflicts, 0 false "missing" findings, 107 of 107 quotes found word for word in the sources, median 14 seconds per analysis. Details and limitations: docs/EVALUATION.md in the repository.

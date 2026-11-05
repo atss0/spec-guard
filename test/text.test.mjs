@@ -108,3 +108,14 @@ test('replaceAcceptanceCriteria keeps a "Requirements" section and stops at the 
   assert.doesNotMatch(text, /old criterion/);
   assert.match(text, /Notes:\nkeep notes/);
 });
+
+test('replaceAcceptanceCriteria refuses when the criteria sit inside a panel', () => {
+  const doc = { type: 'doc', version: 1, content: [
+    { type: 'paragraph', content: [{ type: 'text', text: 'Story' }] },
+    { type: 'panel', attrs: { panelType: 'info' }, content: [
+      { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Acceptance criteria' }] },
+      { type: 'bulletList', content: [] },
+    ] },
+  ] };
+  assert.throws(() => replaceAcceptanceCriteria(doc, ['x'], 'note'), /inside a panel/);
+});

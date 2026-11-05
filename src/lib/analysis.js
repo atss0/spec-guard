@@ -36,10 +36,14 @@ export function verifyQuote(quote, source) {
   if (!q) return true; // nothing to verify (e.g. "not mentioned")
   const src = normalizeForMatch(source);
   const parts = q.split(/\s*(?:\.\.\.|…)\s*/).filter((p) => p.length > 0);
-  let from = 0;
+  // A quote shortened with "..." only counts if every fragment is substantial and the fragments are
+  // close together, so unrelated phrases cannot be stitched into a quote.
+  if (parts.length > 1 && parts.some((p) => p.length < 10)) return false;
+  let from = -1;
   for (const part of parts) {
-    const at = src.indexOf(part, from);
+    const at = src.indexOf(part, Math.max(from, 0));
     if (at < 0) return false;
+    if (from >= 0 && at - from > 300) return false;
     from = at + part.length;
   }
   return true;
@@ -61,8 +65,8 @@ export function normalizeAnalysis(a, specText = '', issueText = '') {
       requirement: String(r.requirement || ''),
       specQuote,
       issueQuote,
-      specQuoteVerified: specText ? verifyQuote(specQuote, specText) : null,
-      issueQuoteVerified: issueText ? verifyQuote(issueQuote, issueText) : null,
+      specQuoteVerified: specText && specQuote.trim() ? verifyQuote(specQuote, specText) : null,
+      issueQuoteVerified: issueText && issueQuote.trim() ? verifyQuote(issueQuote, issueText) : null,
       status: STATUS.includes(r.status) ? r.status : 'unclear',
       explanation: String(r.explanation || ''),
       page: r.page ? String(r.page) : '',
@@ -72,7 +76,7 @@ export function normalizeAnalysis(a, specText = '', issueText = '') {
   // "elsewhere" (delivered by another work item) does not count for or against this work item.
   const scored = requirements.filter((r) => r.status !== 'elsewhere');
   const score = scored.length ? Math.round((100 * scored.reduce((s, r) => s + WEIGHT[r.status], 0)) / scored.length) : null;
-  const quotes = requirements.flatMap((r) => [r.specQuoteVerified, r.issueQuote ? r.issueQuoteVerified : null]).filter((v) => v !== null);
+  const quotes = requirements.flatMap((r) => [r.specQuoteVerified, r.issueQuoteVerified]).filter((v) => v !== null);
   return {
     scope: String((a && a.scope) || ''),
     summary: String((a && a.summary) || ''),
@@ -98,7 +102,7 @@ export function normalizeCoverage(r, itemKeys, specText = '') {
       id: String(q.id || `R${i + 1}`),
       requirement: String(q.requirement || ''),
       specQuote: String(q.specQuote || ''),
-      specQuoteVerified: specText ? verifyQuote(q.specQuote, specText) : null,
+      specQuoteVerified: specText && String(q.specQuote || '').trim() ? verifyQuote(q.specQuote, specText) : null,
       status,
       coveredBy,
       conflictsIn: clean(q.conflictsIn),

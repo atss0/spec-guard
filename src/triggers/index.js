@@ -3,7 +3,7 @@
  * part runs in the queue consumer.
  */
 import { Queue } from '@forge/events';
-import { enqueuePageUpdated, processJob, pollWatchedPages } from '../lib/service';
+import { enqueuePageUpdated, processJob, pollWatchedPages } from '../lib/service.js';
 
 const queue = new Queue({ key: 'specguard-jobs' });
 
