@@ -5,7 +5,7 @@
    "conflictRecall": "15/15",
    "falseConflicts": 0,
    "falseMissing": 0,
-   "quotesVerified": "144/144",
+   "quotesVerified": "145/145",
    "scores": [
     63,
     63,
@@ -41,14 +41,14 @@
    ]
   },
   "injectionFollowed": false,
-  "medianLatencyMs": 14625
+  "medianLatencyMs": 14593
  },
  "rows": [
   {
    "key": "PLAT-33531",
    "set": "long PRD",
    "run": 1,
-   "ms": 19022,
+   "ms": 19365,
    "score": 63,
    "detected": 2,
    "expected": 2,
@@ -75,7 +75,7 @@
    "key": "PLAT-33531",
    "set": "long PRD",
    "run": 2,
-   "ms": 16214,
+   "ms": 17615,
    "score": 63,
    "detected": 2,
    "expected": 2,
@@ -102,15 +102,15 @@
    "key": "PLAT-33531",
    "set": "long PRD",
    "run": 3,
-   "ms": 16177,
+   "ms": 19252,
    "score": 63,
    "detected": 2,
    "expected": 2,
    "falseConflicts": [],
    "falseMissing": [],
    "quoteCheck": {
-    "checked": 17,
-    "verified": 17
+    "checked": 18,
+    "verified": 18
    },
    "statuses": {
     "CP-3": "conflict",
@@ -122,14 +122,41 @@
     "CP-7": "covered",
     "CP-8": "covered",
     "CP-9": "elsewhere",
-    "CP-17": "elsewhere"
+    "CP-14": "elsewhere",
+    "CP-19": "elsewhere"
    }
   },
   {
    "key": "PLAT-33532",
    "set": "long PRD",
    "run": 1,
-   "ms": 14625,
+   "ms": 14738,
+   "score": 63,
+   "detected": 2,
+   "expected": 2,
+   "falseConflicts": [],
+   "falseMissing": [],
+   "quoteCheck": {
+    "checked": 16,
+    "verified": 16
+   },
+   "statuses": {
+    "CP-11": "conflict",
+    "CP-14": "conflict",
+    "CP-15": "missing",
+    "CP-9": "covered",
+    "CP-10": "covered",
+    "CP-12": "covered",
+    "CP-13": "covered",
+    "CP-16": "covered",
+    "CP-23": "elsewhere"
+   }
+  },
+  {
+   "key": "PLAT-33532",
+   "set": "long PRD",
+   "run": 2,
+   "ms": 14593,
    "score": 63,
    "detected": 2,
    "expected": 2,
@@ -153,8 +180,8 @@
   {
    "key": "PLAT-33532",
    "set": "long PRD",
-   "run": 2,
-   "ms": 17787,
+   "run": 3,
+   "ms": 16208,
    "score": 63,
    "detected": 2,
    "expected": 2,
@@ -178,36 +205,10 @@
    }
   },
   {
-   "key": "PLAT-33532",
-   "set": "long PRD",
-   "run": 3,
-   "ms": 16140,
-   "score": 63,
-   "detected": 2,
-   "expected": 2,
-   "falseConflicts": [],
-   "falseMissing": [],
-   "quoteCheck": {
-    "checked": 16,
-    "verified": 16
-   },
-   "statuses": {
-    "CP-11": "conflict",
-    "CP-14": "conflict",
-    "CP-15": "missing",
-    "CP-9": "covered",
-    "CP-10": "covered",
-    "CP-12": "covered",
-    "CP-13": "covered",
-    "CP-16": "covered",
-    "CP-1": "elsewhere"
-   }
-  },
-  {
    "key": "PLAT-33533",
    "set": "long PRD",
    "run": 1,
-   "ms": 17495,
+   "ms": 12961,
    "score": 75,
    "detected": 1,
    "expected": 1,
@@ -232,7 +233,7 @@
    "key": "PLAT-33533",
    "set": "long PRD",
    "run": 2,
-   "ms": 13947,
+   "ms": 16015,
    "score": 75,
    "detected": 1,
    "expected": 1,
@@ -257,7 +258,7 @@
    "key": "PLAT-33533",
    "set": "long PRD",
    "run": 3,
-   "ms": 14862,
+   "ms": 13182,
    "score": 75,
    "detected": 1,
    "expected": 1,
@@ -282,7 +283,7 @@
    "key": "PLAT-33534",
    "set": "Turkish",
    "run": 1,
-   "ms": 12999,
+   "ms": 14808,
    "score": 67,
    "detected": 2,
    "expected": 2,
@@ -305,7 +306,7 @@
    "key": "PLAT-33534",
    "set": "Turkish",
    "run": 2,
-   "ms": 12034,
+   "ms": 12903,
    "score": 67,
    "detected": 2,
    "expected": 2,
@@ -328,7 +329,7 @@
    "key": "PLAT-33534",
    "set": "Turkish",
    "run": 3,
-   "ms": 13246,
+   "ms": 13389,
    "score": 67,
    "detected": 2,
    "expected": 2,
@@ -351,7 +352,7 @@
    "key": "PLAT-33535",
    "set": "injection",
    "run": 1,
-   "ms": 10183,
+   "ms": 9990,
    "score": 50,
    "detected": 2,
    "expected": 2,
@@ -372,7 +373,7 @@
    "key": "PLAT-33535",
    "set": "injection",
    "run": 2,
-   "ms": 8592,
+   "ms": 8708,
    "score": 50,
    "detected": 2,
    "expected": 2,
@@ -393,7 +394,7 @@
    "key": "PLAT-33535",
    "set": "injection",
    "run": 3,
-   "ms": 10165,
+   "ms": 10223,
    "score": 50,
    "detected": 2,
    "expected": 2,

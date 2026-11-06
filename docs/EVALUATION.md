@@ -58,6 +58,8 @@ Three harder cases, run against the live app through the MCP endpoint, 3 runs pe
 
 **Bug found by this set.** The first run of the Turkish case found 0 of 6 conflicts. Confluence stores letters such as ü, ç and ö as named HTML entities (`&uuml;`), and Spec Guard only decoded a few entities, so spec quotes in Turkish never matched the spec text. They were marked unverified, and conflicts with an unverified spec quote are not counted, which is the intended safety behaviour. The decoder now handles all Latin-1 and common named entities, with a unit test; the run above is after the fix. The output of the first run is kept in [`eval2-run1-before-entity-fix.txt`](eval2-run1-before-entity-fix.txt). In both runs the long PRD and injection cases found the same conflicts with no false ones; the long PRD quote count differed slightly (149 of 153 verified in the first run, 144 of 144 in the second).
 
+**Re-run after the stricter conflict rule** (a conflict now needs both quotes found word for word): the same 27 of 27 conflicts with no false ones, 205 of 205 quotes verified, and the injection was again not followed. `eval2-result.json` holds this latest run.
+
 ## Limitations
 
 - These are smoke tests, not a benchmark: four specs and nine work items in total, all written by the builder. Real specs are longer and messier.
