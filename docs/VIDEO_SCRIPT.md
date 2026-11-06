@@ -1,21 +1,23 @@
-# Spec Guard: demo video script (target 2:45, hard limit 3:00)
+# Spec Guard: demo video (2:26)
 
-Judges do not have to watch past 3 minutes, so everything important is in the first 2:45.
+The rendered video follows this script. Every screen is a real capture from the demo site; the terminal scene shows real `claude -p` runs against the Spec Guard MCP server, shortened. Voice-over: neural text to speech.
 
-| time | screen | voice-over |
+| # | Screen | Voice-over |
 |---|---|---|
-| 0:00–0:12 | Logo, then a Confluence spec next to a Jira work item with the mismatching values highlighted (24 h vs 48 h). | "The spec says the reset link expires after 24 hours. The work item says 48. Whoever builds from the work item, a developer or a coding agent, builds 48." |
-| 0:12–0:42 | Jira work item → Spec Guard in the sidebar → Check alignment → report. Zoom on one conflict card with its two quotes, then on the line "N of N quotes found word for word in the sources" (use the number on screen). | "Spec Guard reads the linked spec, works out which requirements this work item owns, and checks each one. Every finding quotes both sides, and every quote is checked against the source text. Requirements owned by other work items are marked as delivered elsewhere, not as missing." |
-| 0:42–1:05 | Align work item with spec → preview of the new acceptance criteria → Apply → automatic re-check (27% → the new score, 89% in our runs). | "It proposes acceptance criteria with the spec's values. You review them and apply. Only the acceptance criteria section changes, a comment records what changed, and the work item is re-checked: 27 to 89 percent." |
-| 1:05–1:30 | Confluence spec page → Spec Guard byline → coverage map: covered, conflicts, gaps (including a work item nobody opened) → Create work items for gaps. | "On the spec page: which work items deliver each requirement, where they contradict each other, and which requirements nobody is building. It also finds work items that link the spec but were never checked. Gaps become linked work items in one click." |
-| 1:30–1:45 | Edit the spec (24 h → 1 h) and publish → the work item's comment "the spec changed, 1 change affects this work item" → panel shows before/after. JQL search `specGuardSpecChanged = 1`. | "When the spec changes, affected work items are told, and the details are shown only to people who can read the spec. Drift is searchable with JQL." |
-| 1:45–2:25 | Split screen, both recorded for real. Left: Claude Code without Spec Guard, prompt "Implement PLAT-33510 as described in the work item" (work item text pasted): it builds a 48 h expiry. Then `verify-change` on that diff: "fails spec", quoting the 24 h requirement. Right: the same prompt with the Spec Guard MCP server: the agent calls `get-spec-context` first and writes 24 h; `verify-change`: pass. Then "fix the work item": `align-work-item` shows the proposal, the user says yes, `apply-alignment`. | "A coding agent that only reads the work item builds 48 hours, and Spec Guard's verify-change catches it. With Spec Guard connected, the agent reads the spec first and gets it right the first time. It can also fix the work item, but only after you approve the proposal." |
-| 2:25–2:35 | Rovo chat on the spec: "Which requirements are not covered?" → answer listing the gaps. | "The same actions are available in Rovo." |
-| 2:35–2:45 | One slide: Forge UI Kit, Forge LLM, Rovo + MCP, events queue with user impersonation, evaluation from the smoke test, both runs (11/12 and 12/12 planted conflicts found, 0 and 1 false conflicts). End card: name, "Try with demo data". | "Built on Forge; the data stays in Atlassian. Spec Guard." |
-
-## Recording notes
-- Use the demo site (Rovo enabled) for Rovo and MCP. Record at 1920×1080, browser zoom 110%.
-- Create the demo scenario beforehand and cut waiting time in editing.
-- Confluence events can arrive late; record the spec-change segment once the comment has appeared (or after clicking *Check specs for changes*) instead of waiting on camera.
-- The quote count on the report card is for that one report. Before recording, check that applying the proposal on the demo work item really reaches the score you say (89% in our runs) and use the number on screen.
-- Voice-over in plain English, own voice or a TTS voice. No copyrighted music.
+| 1 | Title card | This is Spec Guard. |
+| 2 | Spec page (FR-3: 24 hours) and the Jira work item (48 hours), highlighted | The spec in Confluence says the password reset link expires after twenty-four hours. The Jira work item says forty-eight. Whoever builds from the work item, a developer or a coding agent, builds forty-eight. |
+| 3 | Sidebar: Check alignment → 20% aligned, 4 conflicts, 4 missing | Spec Guard checks the work item against its linked spec. One click in the sidebar: twenty percent aligned, four conflicts, four requirements missing. |
+| 4 | Report: "18 of 18 quotes found word for word", a conflict card with both quotes | Every finding quotes both sides, and every quote is checked against the source text. Here, eighteen of eighteen quotes were found word for word. |
+| 5 | Cards for requirements delivered by other work items | It also knows what this work item is not responsible for. Account lockout and analytics belong to other work items, so they are not reported as missing. |
+| 6 | Proposed acceptance criteria | Align work item with spec proposes new acceptance criteria with the spec's values. You review them, then apply. |
+| 7 | Rewritten acceptance criteria; sidebar shows 100% aligned | Only the acceptance criteria change, a comment records why, and the re-check gives one hundred percent. |
+| 8 | Confluence byline: coverage map with 3 gaps and 4 conflicts; conflict cards | On the spec page, the coverage map shows each requirement, the work items that deliver it, and the ones that contradict it. Three requirements have no work item at all. |
+| 9 | Create work items for the gaps → map shows 0 gaps | One click creates linked work items for the gaps. |
+| 10 | Spec edited (24 h → 1 h): out-of-date warning with before/after; Spec Guard comment | When the spec changes, here from twenty-four hours to one hour, affected work items get a comment and an out-of-date warning with the exact before and after. The details are shown only to people who can read the spec. |
+| 11 | JQL search specGuardConflicts > 0 | Drift is searchable with JQL. |
+| 12 | Split screen, left: Claude Code from the work item text builds 48 h / SMS / 8 chars | Coding agents get the same checks through MCP. Without Spec Guard, Claude Code implements the work item as written: forty-eight hours, SMS, and eight characters. |
+| 13 | Left: verify-change → FAIL with spec quotes → fix → PASS | Spec Guard's verify-change fails that change and quotes the spec. The agent fixes the code, and the second check passes. |
+| 14 | Right: Claude Code with Spec Guard: get-spec-context → 24 h → PASS | With Spec Guard connected from the start, the agent reads the spec before writing code, and gets it right the first time. |
+| 15 | Rovo chat with the Spec Guard agent on the spec page | The same actions are available in Rovo. |
+| 16 | Built on Forge + smoke test numbers | Spec Guard runs entirely on Forge with Forge LLM, so the data stays in Atlassian. Each job runs with the permissions of the person who started it, and nothing is written without their approval. |
+| 17 | End card | Spec Guard. Build what the spec says. |

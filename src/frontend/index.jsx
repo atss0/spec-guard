@@ -254,14 +254,15 @@ const AlignmentView = ({ status, onRun, onApplied, running }) => {
       ) : null}
       <Text>
         <Em>
-          Checked {timeAgo(status.analyzedAt)} against {status.pages.map((p) => `“${p.title}” v${p.version}`).join(', ')}
+          Checked {timeAgo(status.analyzedAt)} against {(status.analyzedPages && status.analyzedPages.length ? status.analyzedPages : status.pages).map((p) => `“${p.title}” v${p.version}`).join(', ')}
           {qc && qc.checked ? ` · ${qc.verified} of ${qc.checked} quotes found word for word in the sources` : ''}
         </Em>
       </Text>
 
-      <Stack space="space.100">
-        {reqs.map((r) => (
-          <RequirementCard key={r.id} r={r} />
+      {/* Keyed by the check time so a new result replaces the whole list (requirement ids can change between checks). */}
+      <Stack key={status.analyzedAt} space="space.100">
+        {reqs.map((r, i) => (
+          <RequirementCard key={`${status.analyzedAt}-${i}-${r.id}`} r={r} />
         ))}
       </Stack>
 

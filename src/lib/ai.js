@@ -100,7 +100,7 @@ Rules:
 - "explanation": one sentence with exact values where they differ.
 - At most 12 requirements, conflicts first. "openQuestions": up to 5 ambiguities to clarify before coding.
 Reply with JSON only:
-{"scope":"<one sentence>","summary":"<one or two sentences>","requirements":[{"id":"<spec id like FR-1 if present>","requirement":"<short>","page":"<page title>","specQuote":"...","issueQuote":"...","status":"covered|missing|conflict|unclear|elsewhere","coveredBy":"<sibling key or empty>","explanation":"..."}],"openQuestions":["..."]}`;
+{"scope":"<one sentence>","summary":"<one or two sentences; do not give counts>","requirements":[{"id":"<spec id like FR-1 if present>","requirement":"<short>","page":"<page title>","specQuote":"...","issueQuote":"...","status":"covered|missing|conflict|unclear|elsewhere","coveredBy":"<sibling key or empty>","explanation":"..."}],"openQuestions":["..."]}`;
   const user = [specBlock(pages), siblings.length ? siblingBlock(siblings, 2500) : '', issueBlock(issue)].filter(Boolean).join('\n\n');
   const specText = pages.map((p) => p.text).join('\n');
   return normalizeAnalysis(await askJson(system, user), specText, `${issue.summary}\n${issue.description || ''}`);
@@ -185,7 +185,7 @@ Status per requirement:
 - "gap": no work item delivers it.
 Quote the spec verbatim (specQuote, max ~200 chars). Use only the given work item keys. "note": one sentence with exact values. Out-of-scope or non-goal sections are not requirements.
 Reply with JSON only:
-{"summary":"<one or two sentences>","requirements":[{"id":"<spec id like FR-1 if present, else R1>","requirement":"<short>","specQuote":"...","status":"covered|partial|conflict|gap","coveredBy":["KEY-1"],"conflictsIn":["KEY-2"],"note":"..."}]}`;
+{"summary":"<one or two sentences on the overall picture; do not give counts or list requirement ids>","requirements":[{"id":"<spec id like FR-1 if present, else R1>","requirement":"<short>","specQuote":"...","status":"covered|partial|conflict|gap","coveredBy":["KEY-1"],"conflictsIn":["KEY-2"],"note":"..."}]}`;
   const user = [specBlock([page]), siblingBlock(items, Math.floor(30000 / Math.max(1, items.length))) || '(no linked work items)']
     .join('\n\n')
     .replace(/sibling_work_item/g, 'work_item');

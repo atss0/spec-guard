@@ -278,6 +278,7 @@ export async function getStatus(issueKey, as = 'user') {
     errors,
     analysis: saved ? await hideUnseenSiblings(saved.result, as) : null,
     analyzedAt: saved ? saved.analyzedAt : null,
+    analyzedPages: saved ? saved.pages || [] : [], // versions the report was checked against
     stale: Boolean(saved) && reasons.length > 0,
     staleReasons: reasons,
     // A change can come from a page linked after the analysis; show it only if this user can read that page.
