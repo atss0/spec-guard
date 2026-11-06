@@ -119,3 +119,8 @@ test('replaceAcceptanceCriteria refuses when the criteria sit inside a panel', (
   ] };
   assert.throws(() => replaceAcceptanceCriteria(doc, ['x'], 'note'), /inside a panel/);
 });
+
+test('storageToText decodes named entities used for non-English text', () => {
+  const html = "<p>G&uuml;nl&uuml;k &ouml;zet saat 09:00'da g&ouml;nderilir &ndash; a&ccedil;ık. Stra&szlig;e &eacute;t&eacute; &#287; &#x15F; &amp;lt;</p>";
+  assert.equal(storageToText(html).trim(), "Günlük özet saat 09:00'da gönderilir - açık. Straße été ğ ş &lt;");
+});

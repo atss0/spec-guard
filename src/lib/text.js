@@ -53,18 +53,27 @@ export function adfToText(node) {
   return out.join('').replace(/\n{3,}/g, '\n\n').trim();
 }
 
+// Confluence storage format writes most non-ASCII letters as named entities (&uuml;, &ccedil;, ...).
+// Latin-1 names map to code points 160-255 in this order.
+const LATIN1 =
+  'nbsp iexcl cent pound curren yen brvbar sect uml copy ordf laquo not shy reg macr deg plusmn sup2 sup3 acute micro para middot cedil sup1 ordm raquo frac14 frac12 frac34 iquest Agrave Aacute Acirc Atilde Auml Aring AElig Ccedil Egrave Eacute Ecirc Euml Igrave Iacute Icirc Iuml ETH Ntilde Ograve Oacute Ocirc Otilde Ouml times Oslash Ugrave Uacute Ucirc Uuml Yacute THORN szlig agrave aacute acirc atilde auml aring aelig ccedil egrave eacute ecirc euml igrave iacute icirc iuml eth ntilde ograve oacute ocirc otilde ouml divide oslash ugrave uacute ucirc uuml yacute thorn yuml'.split(' ');
+const NAMED = Object.fromEntries(LATIN1.map((n, i) => [n, String.fromCharCode(160 + i)]));
+Object.assign(NAMED, {
+  nbsp: ' ', lt: '<', gt: '>', quot: '"', apos: "'", amp: '&',
+  lsquo: "'", rsquo: "'", sbquo: "'", ldquo: '"', rdquo: '"', bdquo: '"', ndash: '-', mdash: '-',
+  hellip: '...', bull: '•', euro: '€', trade: '™', rarr: '→', larr: '←', harr: '↔', le: '≤', ge: '≥', ne: '≠',
+  OElig: 'Œ', oelig: 'œ', Scaron: 'Š', scaron: 'š', Yuml: 'Ÿ', circ: 'ˆ', tilde: '˜', zwj: '', zwnj: '', thinsp: ' ', ensp: ' ', emsp: ' ',
+});
+
 function decodeEntities(s) {
-  return s
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&[lr]squo;/g, "'")
-    .replace(/&[lr]dquo;/g, '"')
-    .replace(/&[nm]dash;/g, '-')
-    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
-    .replace(/&amp;/g, '&');
+  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]*);/gi, (m, e) => {
+    if (e[0] === '#') {
+      const code = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1));
+      if (code === 39) return "'";
+      return Number.isFinite(code) && code > 0 && code < 0x110000 ? String.fromCodePoint(code) : m;
+    }
+    return Object.prototype.hasOwnProperty.call(NAMED, e) ? NAMED[e] : m;
+  });
 }
 
 /** Plain text of Confluence storage format (XHTML). */

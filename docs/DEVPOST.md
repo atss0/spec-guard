@@ -35,7 +35,7 @@ Design choices aimed at trust:
 - Changes to work item content are always proposed first and applied only after the user approves; agents cannot apply a proposal made for someone else, and agent actions refuse to run without a known user.
 
 ## Evaluation
-On a seeded spec with 4 planted conflicts across 4 work items, analysed 3 times each, in two runs: 11 and 12 of 12 conflicts found, 0 and 1 false conflicts, no false "missing" findings, every checked quote found word for word in the sources (105 of 105 in the latest run), median 14 seconds per analysis. It is a smoke test, not a benchmark. Details and limitations: docs/EVALUATION.md in the repository.
+On a seeded spec with 4 planted conflicts across 4 work items, analysed 3 times each, in two runs: 11 and 12 of 12 conflicts found, 0 and 1 false conflicts, no false "missing" findings, every checked quote found word for word in the sources (105 of 105 in the latest run), median 14 seconds per analysis. A second set (a 24-requirement PRD with tables and stale values, a Turkish spec, and a spec containing a prompt injection) found 27 of 27 planted conflicts across 15 runs with no false conflicts, and the injected instruction was not followed; it also exposed a bug with HTML entities in non-English specs, which we fixed. These are smoke tests, not a benchmark. Details and limitations: docs/EVALUATION.md in the repository.
 
 ## Challenges we ran into
 - Background jobs that read Confluence as the app user failed on restricted spaces. Offline user impersonation fixed that and made the permission model simpler.
@@ -52,7 +52,7 @@ Spec drift is mostly a context problem. People and agents both need the current 
 ## What's next
 - Pull request checks when Forge supports Bitbucket in apps that span Jira and Confluence.
 - Teamwork Graph to find spec and work item links automatically.
-- Longer and non-English evaluation sets.
+- Larger evaluation sets from real (anonymised) specs.
 
 ## Built with
 Atlassian Forge, UI Kit, Forge LLM, Rovo, rovo:mcp, Forge events, Forge KVS, Jira REST, Confluence REST, JavaScript.

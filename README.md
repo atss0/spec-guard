@@ -12,7 +12,7 @@
   <img alt="Rovo agent" src="https://img.shields.io/badge/Rovo-agent-7C3AED">
   <img alt="MCP" src="https://img.shields.io/badge/MCP-9%20tools-7C3AED">
   <img alt="Runs on Atlassian" src="https://img.shields.io/badge/Runs%20on-Atlassian-0F766E">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-39%20passing-16A34A">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-40%20passing-16A34A">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-64748B">
 </p>
 
@@ -168,6 +168,8 @@ A small, repeatable smoke test with planted conflicts, run against the live app 
 | False conflicts | 0 | 1 |
 | False "missing" (owned by another work item) | 0 | 0 |
 | Quotes found word for word | 107 / 107 | 105 / 105 |
+
+A second set adds a 24-requirement PRD with tables and stale values in its revision history, a Turkish spec, and a spec that contains a prompt injection: **27 of 27** planted conflicts found across 15 runs, **0** false conflicts, every quote verified, and the injected instruction was not followed. This set also found a real bug (HTML entities in non-English specs), fixed before the final run.
 
 ## Install
 
