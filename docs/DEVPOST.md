@@ -4,6 +4,13 @@
 **Bonus prize:** Best app with Atlassian MCP (also eligible: Best Agents)
 **Tagline:** Checks Jira work items, and the code agents write for them, against the Confluence spec.
 
+## Try it in 3 minutes
+1. Install with the installation link in the README (https://github.com/atss0/spec-guard#install): Jira first, then Confluence.
+2. Jira → **Apps → Spec Guard** → *Try with demo data* → pick a Jira space and a Confluence space → **Create demo scenario**.
+3. Open the first demo work item → **Check alignment** in the Spec Guard sidebar section. The full report is under the **Apps** button next to the title.
+4. For MCP (needs a site with Rovo): enable tools for Spec Guard in Atlassian Administration → Connected apps, then
+   `claude mcp add --transport http spec-guard https://mcp.atlassian.com/forge/00236d0b-a8f0-4b50-82c2-f1d2d34642cc` and ask Claude Code to implement the demo work item.
+
 ## Inspiration
 A PM changes a requirement in Confluence: the password reset link now expires after 24 hours. The Jira work item still says 48. The developer builds from the work item. Someone notices in QA, or a customer does.
 
@@ -13,7 +20,7 @@ Coding agents make this more likely. An agent reads the work item it is given. I
 Spec Guard treats the Confluence spec as the source of truth.
 
 - **Alignment report on every work item.** It works out which requirements of the linked spec the work item is responsible for and marks each one covered, missing, conflicting, unclear, or delivered by another work item. Every finding quotes both the spec and the work item, and every quote is checked against its source.
-- **Align work item with spec.** Proposes acceptance criteria with the spec's values. You review the changes and apply them; a comment records what changed. In the demo the work item goes from 27% to 89% aligned.
+- **Align work item with spec.** Proposes acceptance criteria with the spec's values. You review the changes and apply them; a comment records what changed. In the demo video the work item goes from 20% to 100% aligned.
 - **Coverage map on the spec page.** For each requirement: the work items that deliver it, conflicts between them, and gaps nobody is building. One click creates linked work items for the gaps.
 - **Spec changes reach the work items.** Linked work items get a comment and are marked out of date; the details are shown in Spec Guard to people who can read the spec. Work items are re-checked automatically when their description changes.
 - **Verify a change.** Paste a summary or diff and get pass / needs attention / fails spec, with spec quotes and fixes.
@@ -31,7 +38,7 @@ Spec Guard treats the Confluence spec as the source of truth.
 Design choices aimed at trust:
 - Quotes are verified against the source text; unverified quotes are labelled.
 - Spec and work item text is passed to the model as data, with instructions inside it ignored.
-- Analyses and diffs are only shown to users who can read the spec; Jira comments never contain spec text.
+- Analyses and diffs are only shown to users who can read the spec; the automatic spec-change comment never contains spec text.
 - Changes to work item content are always proposed first and applied only after the user approves; agents cannot apply a proposal made for someone else, and agent actions refuse to run without a known user.
 
 ## Evaluation

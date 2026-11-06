@@ -80,6 +80,8 @@ function decodeEntities(s) {
 export function storageToText(html) {
   if (!html) return '';
   let s = html;
+  // Code blocks keep their text; escape it so the tag stripping below does not eat it.
+  s = s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (_, c) => '\n' + c.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '\n');
   s = s.replace(/<ac:parameter[^>]*>[\s\S]*?<\/ac:parameter>/g, ''); // macro parameters are not content
   s = s.replace(/<h([1-6])[^>]*>/g, (_, l) => '\n' + '#'.repeat(Number(l)) + ' ');
   s = s.replace(/<\/h[1-6]>/g, '\n');
@@ -173,9 +175,22 @@ export function replaceAcceptanceCriteria(adf, items, note) {
     }
     return { type: 'doc', version: 1, content: [...content, heading('Acceptance criteria'), ...section] };
   }
+  // Replace only what belongs to the criteria: the lists directly under the label, empty paragraphs
+  // and an earlier Spec Guard note. The first other node (text, a link card, a panel, a heading, ...)
+  // ends the section, so nothing else in the description is removed.
   let end = start + 1;
-  const isNextSection = (n) => n.type === 'heading' || (n.type === 'paragraph' && /^\s*\S[^.]{0,40}:\s*$/.test(nodeText(n)));
-  while (end < content.length && !isNextSection(content[end])) end++;
+  const LISTS = ['bulletList', 'orderedList', 'taskList'];
+  const isOurNote = (n) => n.type === 'paragraph' && /^Aligned with .* by Spec Guard on \d{4}-\d{2}-\d{2}\.?$/.test(nodeText(n).trim());
+  const isEmpty = (n) => n.type === 'paragraph' && !nodeText(n).trim() && !(n.content || []).some((c) => c.type !== 'text' && c.type !== 'hardBreak');
+  if (end < content.length && LISTS.includes(content[end].type)) {
+    while (end < content.length && (LISTS.includes(content[end].type) || isOurNote(content[end]) || isEmpty(content[end]))) end++;
+  } else {
+    // Criteria written as plain paragraphs: take plain-text paragraphs up to the next label
+    // ("Notes:"), heading or any other kind of node.
+    const plain = (n) => n.type === 'paragraph' && !(n.content || []).some((c) => c.type !== 'text' && c.type !== 'hardBreak');
+    const isLabel = (n) => n.type === 'paragraph' && /^\s*\S[^.]{0,40}:\s*$/.test(nodeText(n));
+    while (end < content.length && plain(content[end]) && !isLabel(content[end])) end++;
+  }
   return { type: 'doc', version: 1, content: [...content.slice(0, start + 1), ...section, ...content.slice(end)] };
 }
 

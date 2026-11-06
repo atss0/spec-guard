@@ -78,10 +78,12 @@ export function normalizeAnalysis(a, specText = '', issueText = '') {
       coveredBy: r.coveredBy ? String(r.coveredBy).toUpperCase() : '',
     };
   });
-  // A conflict whose spec quote cannot be found in the spec is not trusted: it is shown as "unclear"
-  // (with a note) and does not count as a conflict in the score or the JQL property.
+  // A conflict needs a spec quote that is found in the spec. Without one (wrong or empty quote) it is
+  // shown as "unclear" with a note and does not count as a conflict in the score or the JQL property.
   for (const r of requirements) {
-    if (r.status === 'conflict' && r.specQuoteVerified === false) {
+    const specOk = !specText || r.specQuoteVerified === true;
+    const issueOk = !issueText || r.issueQuoteVerified === true;
+    if (r.status === 'conflict' && !(specOk && issueOk)) {
       r.status = 'unclear';
       r.unverifiedConflict = true;
     }
@@ -111,11 +113,16 @@ export function normalizeCoverage(r, itemKeys, specText = '') {
     let status = COVERAGE.includes(q.status) ? q.status : 'gap';
     // A "covered" requirement must name the work item that covers it.
     if ((status === 'covered' || status === 'partial') && coveredBy.length === 0) status = 'gap';
+    const specQuoteVerified = specText ? verifyQuote(q.specQuote, specText) : null;
+    // Same trust rule as the alignment report: a conflict needs a spec quote found in the spec.
+    const unverifiedConflict = Boolean(specText) && status === 'conflict' && specQuoteVerified !== true;
+    if (unverifiedConflict) status = coveredBy.length ? 'partial' : 'gap';
     return {
       id: String(q.id || `R${i + 1}`),
       requirement: String(q.requirement || ''),
       specQuote: String(q.specQuote || ''),
-      specQuoteVerified: specText ? verifyQuote(q.specQuote, specText) : null,
+      specQuoteVerified,
+      unverifiedConflict,
       status,
       coveredBy,
       conflictsIn: clean(q.conflictsIn),

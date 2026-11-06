@@ -56,7 +56,9 @@ const Keys = ({ keys }) => (
 );
 
 /** Creates work items for uncovered requirements after the user confirms. */
-const GapCreator = ({ gaps, onCreated }) => {
+const GapCreator = ({ gaps: allGaps, mapAt, onCreated }) => {
+  // The server creates at most 10 per click and only for gaps whose spec quote was found.
+  const gaps = allGaps.filter((g) => g.specQuoteVerified !== false).slice(0, 10);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
@@ -65,7 +67,7 @@ const GapCreator = ({ gaps, onCreated }) => {
   const create = async () => {
     setBusy(true);
     setError(null);
-    const r = await invoke('createGapItems', { reqIds: gaps.map((g) => g.id) });
+    const r = await invoke('createGapItems', { reqIds: gaps.map((g) => g.id), mapAt });
     setBusy(false);
     if (r.ok) {
       setResult(r.data);
@@ -157,7 +159,12 @@ const CoverageView = ({ cov, stale, running, onRun }) => {
           <Text>The spec or its linked work items changed since this map was built.</Text>
         </SectionMessage>
       ) : null}
-      {t.gap ? <GapCreator gaps={cov.requirements.filter((q) => q.status === 'gap')} onCreated={onRun} /> : null}
+      {cov.capped ? (
+        <SectionMessage appearance="warning">
+          <Text>This spec has more linked work items than the map reads, so some gaps may be false.</Text>
+        </SectionMessage>
+      ) : null}
+      {t.gap && !cov.capped ? <GapCreator gaps={cov.requirements.filter((q) => q.status === 'gap')} mapAt={cov.analyzedAt} onCreated={onRun} /> : null}
       {reqs.map((q) => (
         <Box key={q.id} xcss={card}>
           <Stack space="space.050">
@@ -181,6 +188,11 @@ const CoverageView = ({ cov, stale, running, onRun }) => {
               </Inline>
             ) : null}
             {q.note ? <Text>{q.note}</Text> : null}
+            {q.unverifiedConflict ? (
+              <Text>
+                <Em>Reported as a conflict, but its spec quote was not found in the spec, so it is not counted as one.</Em>
+              </Text>
+            ) : null}
             {q.status === 'gap' && q.specQuote ? (
               <Text>
                 <Em>“{q.specQuote}”</Em>
@@ -247,7 +259,7 @@ const App = () => {
         </SectionMessage>
       ) : null}
       {items.rows.length === 0 ? (
-        <Text>No checked work items link this page yet.</Text>
+        <Text>None of the work items linking this page has been checked yet.</Text>
       ) : (
         <Stack space="space.075">
           <Text>

@@ -124,3 +124,29 @@ test('storageToText decodes named entities used for non-English text', () => {
   const html = "<p>G&uuml;nl&uuml;k &ouml;zet saat 09:00'da g&ouml;nderilir &ndash; a&ccedil;ık. Stra&szlig;e &eacute;t&eacute; &#287; &#x15F; &amp;lt;</p>";
   assert.equal(storageToText(html).trim(), "Günlük özet saat 09:00'da gönderilir - açık. Straße été ğ ş &lt;");
 });
+
+test('replaceAcceptanceCriteria keeps everything after the criteria lists', () => {
+  const t = (x) => ({ type: 'paragraph', content: [{ type: 'text', text: x }] });
+  const doc = { type: 'doc', version: 1, content: [
+    t('Story text'),
+    { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Acceptance criteria' }] },
+    { type: 'bulletList', content: [{ type: 'listItem', content: [t('old 48 hours')] }] },
+    t('Aligned with "Spec" v1 by Spec Guard on 2026-11-05.'),
+    t('Design notes stay here.'),
+    { type: 'blockCard', attrs: { url: 'https://x.atlassian.net/wiki/spaces/S/pages/100/Spec' } },
+    { type: 'panel', attrs: { panelType: 'info' }, content: [t('Panel stays')] },
+  ] };
+  const out = replaceAcceptanceCriteria(doc, ['new 24 hours'], 'Aligned with "Spec" v2 by Spec Guard on 2026-11-06.');
+  const text = JSON.stringify(out);
+  assert.ok(!text.includes('old 48 hours'));
+  assert.ok(text.includes('new 24 hours'));
+  assert.ok(text.includes('Design notes stay here.'));
+  assert.ok(text.includes('blockCard'));
+  assert.ok(text.includes('Panel stays'));
+  assert.equal((text.match(/by Spec Guard on/g) || []).length, 1, 'old note replaced, not duplicated');
+});
+
+test('storageToText keeps code block text', () => {
+  const html = '<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[if (a > b) x();]]></ac:plain-text-body></ac:structured-macro>';
+  assert.equal(storageToText(html).trim(), 'if (a > b) x();');
+});

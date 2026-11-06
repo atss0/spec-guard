@@ -96,6 +96,9 @@ resolver.define(
 resolver.define('pageAlignment', safe((req) => pageAlignment(pageIdOf(req))));
 resolver.define('requestCoverage', safe((req) => requestCoverage(pageIdOf(req), accountOf(req))));
 resolver.define('getCoverage', safe((req) => getCoverage(pageIdOf(req))));
-resolver.define('createGapItems', safe((req) => createGapItems(pageIdOf(req), (req.payload && req.payload.reqIds) || null, 'user')));
+resolver.define(
+  'createGapItems',
+  safe((req) => createGapItems(pageIdOf(req), (req.payload && req.payload.reqIds) || null, 'user', { mapAt: (req.payload && req.payload.mapAt) || null }))
+);
 
 export const handler = resolver.getDefinitions();

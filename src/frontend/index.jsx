@@ -85,7 +85,7 @@ const RequirementCard = ({ r }) => (
       {r.explanation ? <Text>{r.explanation}</Text> : null}
       {r.unverifiedConflict ? (
         <Text>
-          <Em>Reported as a conflict, but the spec quote was not found in the spec, so it is not counted as one. Check it by hand.</Em>
+          <Em>Reported as a conflict, but a quote was not found word for word in its source, so it is not counted as one. Check it by hand.</Em>
         </Text>
       ) : null}
     </Stack>
@@ -258,6 +258,14 @@ const AlignmentView = ({ status, onRun, onApplied, running }) => {
           {qc && qc.checked ? ` · ${qc.verified} of ${qc.checked} quotes found word for word in the sources` : ''}
         </Em>
       </Text>
+      {a.truncatedPages && a.truncatedPages.length ? (
+        <SectionMessage appearance="warning" title="Spec was clipped">
+          <Text>
+            {a.truncatedPages.map((t) => `“${t}”`).join(', ')} is longer than Spec Guard can read in one check, so requirements near the end may be
+            missing from this report.
+          </Text>
+        </SectionMessage>
+      ) : null}
 
       {/* Keyed by the check time so a new result replaces the whole list (requirement ids can change between checks). */}
       <Stack key={status.analyzedAt} space="space.100">

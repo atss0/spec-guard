@@ -12,7 +12,7 @@
   <img alt="Rovo agent" src="https://img.shields.io/badge/Rovo-agent-7C3AED">
   <img alt="MCP" src="https://img.shields.io/badge/MCP-9%20tools-7C3AED">
   <img alt="Runs on Atlassian" src="https://img.shields.io/badge/Runs%20on-Atlassian-0F766E">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-40%20passing-16A34A">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-46%20passing-16A34A">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-64748B">
 </p>
 
@@ -76,7 +76,7 @@ From the Confluence byline: each requirement, the work items that deliver it, th
 
 ### 4. Tells work items when the spec changes
 
-When a spec page changes, each affected work item gets a short comment and its report is marked out of date, with the exact before and after. The before/after text is shown only to people who can read the spec; the Jira comment never contains spec text.
+When a spec page changes, each affected work item gets a short comment and its report is marked out of date, with the exact before and after. The before/after text is shown only to people who can read the spec; the automatic Jira comment never contains spec text.
 
 <img src="docs/screens/spec-changed.png" alt="Out-of-date warning with before and after" width="760">
 <img src="docs/screens/spec-change-comment.png" alt="Spec Guard comment on the work item" width="760">
@@ -152,7 +152,8 @@ flowchart LR
 | JQL issue property | Written by the app |
 
 - Analyses, coverage maps and before/after diffs contain spec text and are only returned to users who can read every spec page they are based on. Findings and notes about work items the viewer cannot see are hidden.
-- Comments written to Jira never contain spec text.
+- The automatic spec-change comment never contains spec text. Text that a person chooses to write into Jira (applied acceptance criteria, gap work items) does quote the requirement, because that is its purpose.
+- A conflict only counts when both its spec quote and its work item quote are found word for word; otherwise it is shown as unclear.
 - Spec and work item text is passed to the model inside data tags, and the model is told not to follow instructions in it.
 - Agent actions refuse to run when the calling user cannot be identified; they never fall back to the app's permissions.
 - Changes to work item content need a person: aligning is propose, then apply (single use, same user, 24 hours, refused if the work item changed in between). Gap work items from an agent need a preview and a second call with its `previewId`.

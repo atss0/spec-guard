@@ -187,3 +187,11 @@ test('agents create exactly the previewed gaps, once, for the same user', async 
   assert.ok(pv.previewId);
   await assert.rejects(service.createGapItems('100', null, 'user', { confirm: true, previewId: pv.previewId, previewOwner: 'mallory' }), /another user/);
 });
+
+test('gap work items are refused when the coverage map is incomplete or changed', async () => {
+  const base = { pageVersion: 3, analyzedAt: 't1', items: [{ key: 'PLAT-1' }], requirements: [{ id: 'R1', status: 'gap', requirement: 'Audit log', specQuote: 'Every reset is logged.', coveredBy: [], conflictsIn: [] }] };
+  store.set('coverage:100', { ...base, capped: true });
+  await assert.rejects(service.createGapItems('100', null, 'user'), /more linked work items/);
+  store.set('coverage:100', base);
+  await assert.rejects(service.createGapItems('100', null, 'user', { mapAt: 't0' }), /changed since you opened it/);
+});

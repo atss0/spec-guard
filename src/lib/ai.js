@@ -103,7 +103,11 @@ Reply with JSON only:
 {"scope":"<one sentence>","summary":"<one or two sentences; do not give counts>","requirements":[{"id":"<spec id like FR-1 if present>","requirement":"<short>","page":"<page title>","specQuote":"...","issueQuote":"...","status":"covered|missing|conflict|unclear|elsewhere","coveredBy":"<sibling key or empty>","explanation":"..."}],"openQuestions":["..."]}`;
   const user = [specBlock(pages), siblings.length ? siblingBlock(siblings, 2500) : '', issueBlock(issue)].filter(Boolean).join('\n\n');
   const specText = pages.map((p) => p.text).join('\n');
-  return normalizeAnalysis(await askJson(system, user), specText, `${issue.summary}\n${issue.description || ''}`);
+  const result = normalizeAnalysis(await askJson(system, user), specText, `${issue.summary}\n${issue.description || ''}`);
+  // Very long specs are clipped to fit the model input; say so instead of failing silently.
+  const perPage = Math.floor(MAX_SPEC_CHARS / Math.max(pages.length, 1));
+  result.truncatedPages = pages.filter((p) => (p.text || '').length > perPage).map((p) => p.title);
+  return result;
 }
 
 // ---------- change verification ----------

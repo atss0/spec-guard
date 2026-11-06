@@ -38,7 +38,7 @@ test('normalizeAnalysis scores in-scope requirements and ignores "elsewhere"', (
     {
       requirements: [
         { requirement: 'a', status: 'covered' },
-        { requirement: 'b', status: 'conflict' },
+        { requirement: 'b', status: 'conflict', specQuote: 'expires 24 hours after it is sent' },
         { requirement: 'c', status: 'unclear' },
         { requirement: 'd', status: 'elsewhere', coveredBy: 'plat-2' },
         { requirement: 'e', status: 'bogus' },
@@ -125,4 +125,30 @@ test('a conflict whose spec quote is not in the spec is not counted as a conflic
 test('very short quotes do not count as verified', () => {
   assert.equal(verifyQuote('24', SPEC), false);
   assert.equal(verifyQuote('the', SPEC), false);
+});
+
+test('a conflict without a spec quote is not counted', () => {
+  const a = normalizeAnalysis({ requirements: [{ id: 'R1', status: 'conflict', specQuote: '', issueQuote: '' }] }, SPEC, 'x');
+  assert.equal(a.requirements[0].status, 'unclear');
+});
+
+test('coverage conflicts need a verified spec quote too', () => {
+  const c = normalizeCoverage(
+    { requirements: [{ id: 'FR-3', status: 'conflict', specQuote: 'The link expires after 72 hours.', coveredBy: ['A-1'], conflictsIn: ['A-1'] }] },
+    ['A-1'],
+    SPEC,
+  );
+  assert.equal(c.requirements[0].status, 'partial');
+  assert.equal(c.requirements[0].unverifiedConflict, true);
+  assert.equal(c.totals.conflict, 0);
+});
+
+test('a conflict with an invented work item quote is not counted', () => {
+  const a = normalizeAnalysis(
+    { requirements: [{ id: 'FR-3', status: 'conflict', specQuote: 'expires 24 hours after it is sent', issueQuote: 'The link is valid for 72 hours.' }] },
+    SPEC,
+    'Reset link is valid for 48 hours and can be used once.',
+  );
+  assert.equal(a.requirements[0].status, 'unclear');
+  assert.equal(a.score, 50);
 });

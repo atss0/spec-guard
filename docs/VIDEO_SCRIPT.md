@@ -19,5 +19,5 @@ The rendered video follows this script. Every screen is a real capture from the 
 | 13 | Left: verify-change → FAIL with spec quotes → fix → PASS | Spec Guard's verify-change fails that change and quotes the spec. The agent fixes the code, and the second check passes. |
 | 14 | Right: Claude Code with Spec Guard: get-spec-context → 24 h → PASS | With Spec Guard connected from the start, the agent reads the spec before writing code, and gets it right the first time. |
 | 15 | Rovo chat with the Spec Guard agent on the spec page | The same actions are available in Rovo. |
-| 16 | Built on Forge + smoke test numbers | Spec Guard runs entirely on Forge with Forge LLM, so the data stays in Atlassian. Each job runs with the permissions of the person who started it, and nothing is written without their approval. |
+| 16 | Built on Forge + smoke test numbers | Spec Guard runs entirely on Forge with Forge LLM, so the data stays in Atlassian. Each job runs with the permissions of the person who started it, and changes to a work item are only applied after a person approves them. |
 | 17 | End card | Spec Guard. Build what the spec says. |
